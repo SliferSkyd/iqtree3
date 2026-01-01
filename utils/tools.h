@@ -2493,6 +2493,8 @@ public:
 	bool ufboot2corr; // to turn on the correction mode for UFBoot under model violations, enable by "-bb <nrep> -correct
 	bool u2c_nni5; // to use NNI5 during Refinement Step of UFBoot2-Corr
 
+    bool nbs; // to turn on NBS, enabled by "-nbs"
+    bool fnbs; // to turn on fast NBS, enabled by "-fnbs"
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
 

@@ -4520,6 +4520,14 @@ void parseArg(int argc, char *argv[], Params &params) {
 //				params.print_ufboot_trees = 2; // Diep: relocate to be below this for loop
 				continue;
 			}
+            if (strcmp(argv[cnt], "--nbs") == 0 || strcmp(argv[cnt], "-nbs") == 0) {
+				params.nbs = true;
+				continue;
+			}
+            if (strcmp(argv[cnt], "--fnbs") == 0 || strcmp(argv[cnt], "-fnbs") == 0) {
+				params.fnbs = true;
+				continue;
+			}
 			if (strcmp(argv[cnt], "-u2c_nni5") == 0) {
 				params.u2c_nni5 = true;
 				continue;
@@ -6355,6 +6363,8 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --nstep NUM          Iterations for UFBoot stopping rule (default: 100)" << endl
     << "  --bcor NUM           Minimum correlation coefficient (default: 0.99)" << endl
     << "  --beps NUM           RELL epsilon to break tie (default: 0.5)" << endl
+    << "  --nbs                Use little bootstrap" << endl 
+    << "  --fnbs               Use fast little bootstrap" << endl
     << "  --bnni               Optimize UFBoot trees by NNI on bootstrap alignment" << endl
     << endl << "NON-PARAMETRIC BOOTSTRAP/JACKKNIFE:" << endl
     << "  -b, --boot NUM       Replicates for bootstrap + ML tree + consensus tree" << endl
@@ -7921,6 +7931,8 @@ void Params::setDefault() {
     print_all_checkpoints = false;
     suppress_output_flags = 0;
     ufboot2corr = false;
+    nbs = false;
+    fnbs = false;
     u2c_nni5 = false;
     date_with_outgroup = true;
     date_debug = false;

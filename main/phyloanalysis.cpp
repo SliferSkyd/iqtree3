@@ -4782,6 +4782,409 @@ void runStandardBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     delete model_info;
 }
 
+void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
+    ModelCheckpoint *model_info = new ModelCheckpoint;
+    StrVector removed_seqs, twin_seqs;
+    
+    string treefile_name = params.out_prefix;
+    treefile_name += ".treefile";
+    string boottrees_name = params.out_prefix;
+    boottrees_name += ".boottrees";
+    string bootaln_name = params.out_prefix;
+    bootaln_name += ".bootaln";
+    string bootlh_name = params.out_prefix;
+    bootlh_name += ".bootlh";
+    int bootSample = 0;
+    if (tree->getCheckpoint()->get("bootSample", bootSample)) {
+        cout << "CHECKPOINT: " << bootSample << " bootstrap analyses restored" << endl;
+    } else if (MPIHelper::getInstance().isMaster()) {
+        // first empty the boottrees file
+        try {
+            ofstream tree_out;
+            tree_out.exceptions(ios::failbit | ios::badbit);
+            tree_out.open(boottrees_name.c_str());
+            tree_out.close();
+        } catch (ios::failure) {
+            outError(ERR_WRITE_OUTPUT, boottrees_name);
+        }
+
+        // empty the bootaln file
+        if (params.print_bootaln)
+        try {
+            ofstream tree_out;
+            tree_out.exceptions(ios::failbit | ios::badbit);
+            tree_out.open(bootaln_name.c_str());
+            tree_out.close();
+        } catch (ios::failure) {
+            outError(ERR_WRITE_OUTPUT, bootaln_name);
+        }
+    }
+
+    double start_time = getCPUTime();
+    double start_real_time = getRealTime();
+
+    startTreeReconstruction(params, tree, *model_info);
+    
+    // 2018-06-21: bug fix: alignment might be changed by -m ...MERGE
+    alignment = tree->aln;
+
+    if (params.compute_ml_tree) {
+        cout << endl << "===> START ANALYSIS ON THE ORIGINAL ALIGNMENT" << endl << endl;
+        if (params.num_runs == 1)
+            runTreeReconstruction(params, tree);
+        else
+            runMultipleTreeReconstruction(params, tree->aln, tree);
+    }
+
+    // turn off all branch tests
+    int saved_aLRT_replicates = params.aLRT_replicates;
+    int saved_localbp_replicates = params.localbp_replicates;
+    bool saved_aLRT_test = params.aLRT_test;
+    bool saved_aBayes_test = params.aBayes_test;
+    params.aLRT_replicates = 0;
+    params.localbp_replicates = 0;
+    params.aLRT_test = false;
+    params.aBayes_test = false;
+    
+    MExtTree ext_tree;
+    cout << "Reading tree " << treefile_name.c_str() << " ..." << endl;
+    bool is_rooted;
+    ext_tree.init(treefile_name.c_str(), is_rooted);
+    
+    // do bootstrap analysis
+
+    double nbs_threshold = 0.05;
+    std::vector<double> last_weights_vec;
+    double rmsd;
+    int iteration = 0;
+    do {
+        cout << endl << "===> ITERATION: " << iteration + 1 << endl << endl;
+        for (int sample = bootSample; sample < params.num_bootstrap_samples; sample++) {
+            cout << endl << "===> START " << RESAMPLE_NAME_UPPER << " REPLICATE NUMBER "
+                    << sample + 1 << endl << endl;
+
+            // 2015-12-17: initialize random stream for creating bootstrap samples
+            // mainly so that checkpointing does not need to save bootstrap samples
+            int *saved_randstream = randstream;
+            init_random(params.ran_seed + sample);
+
+            Alignment* bootstrap_alignment;
+            cout << "Creating " << RESAMPLE_NAME << " alignment (seed: " << params.ran_seed+sample << ")..." << endl;
+
+            if (alignment->isSuperAlignment())
+                bootstrap_alignment = new SuperAlignment;
+            else
+                bootstrap_alignment = new Alignment;
+            bootstrap_alignment->createBootstrapAlignment(alignment, NULL, params.bootstrap_spec);
+
+            // restore randstream
+            finish_random();
+            randstream = saved_randstream;
+
+            IQTree *boot_tree;
+            if (alignment->isSuperAlignment()){
+                if(params.partition_type != BRLEN_OPTIMIZE){
+                    boot_tree = new PhyloSuperTreePlen((SuperAlignment*) bootstrap_alignment, (PhyloSuperTree*) tree);
+                } else {
+                    boot_tree = new PhyloSuperTree((SuperAlignment*) bootstrap_alignment, (PhyloSuperTree*) tree);
+                }
+            } else {
+                // allocate heterotachy tree if neccessary
+                int pos = posRateHeterotachy(alignment->model_name);
+                
+                if (params.num_mixlen > 1) {
+                    boot_tree = new PhyloTreeMixlen(bootstrap_alignment, params.num_mixlen);
+                } else if (pos != string::npos) {
+                    boot_tree = new PhyloTreeMixlen(bootstrap_alignment, 0);
+                } else
+                    boot_tree = new IQTree(bootstrap_alignment);
+            }
+
+            if (!tree->constraintTree.empty()) {
+                boot_tree->constraintTree.readConstraint(tree->constraintTree);
+            }
+
+            // set checkpoint
+            boot_tree->setCheckpoint(tree->getCheckpoint());
+            boot_tree->num_precision = tree->num_precision;
+
+            runTreeReconstruction(params, boot_tree);
+            // read in the output tree file
+            stringstream ss;
+            boot_tree->printTree(ss);
+
+            if (MPIHelper::getInstance().isMaster())
+            try {
+                ofstream tree_out;
+                tree_out.exceptions(ios::failbit | ios::badbit);
+                tree_out.open(boottrees_name.c_str(), ios_base::out | ios_base::app);
+                tree_out << ss.str() << endl;
+                tree_out.close();
+            } catch (ios::failure) {
+                outError(ERR_WRITE_OUTPUT, boottrees_name);
+            }
+
+            if (params.num_bootstrap_samples == 1)
+                reportPhyloAnalysis(params, *boot_tree, *model_info);
+
+            bootstrap_alignment = boot_tree->aln;
+            delete boot_tree;
+            delete bootstrap_alignment;
+
+            // clear all checkpointed information
+            tree->getCheckpoint()->keepKeyPrefix("iqtree");
+            tree->getCheckpoint()->put("bootSample", sample+1);
+            tree->getCheckpoint()->putBool("finished", false);
+            tree->getCheckpoint()->dump(true);
+        }
+
+        std::vector<double> weights_vec;
+
+        if (params.compute_ml_tree) {
+            if (MPIHelper::getInstance().isMaster()) {
+                cout << endl << "===> ASSIGN " << RESAMPLE_NAME_UPPER
+                    << " SUPPORTS TO THE TREE FROM ORIGINAL ALIGNMENT" << endl << endl;
+
+                assignLittleBootstrapSupport(boottrees_name.c_str(), 0, 1e6,
+                        treefile_name.c_str(), false, treefile_name.c_str(),
+                        params.out_prefix, ext_tree, NULL, &params, iteration, weights_vec);   
+            }
+        } else cout << endl; 
+
+        if (last_weights_vec.empty()) {
+            rmsd = DBL_MAX;
+        } else {
+            assert(last_weights_vec.size() == weights_vec.size());
+            double sum_sq = 0.0;
+            for (size_t i = 0; i < weights_vec.size(); i++) {
+                double diff = (weights_vec[i] - last_weights_vec[i]) / 100;
+                sum_sq += diff * diff;
+            }
+            rmsd = sqrt(sum_sq / weights_vec.size());
+        }
+        std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
+        last_weights_vec = weights_vec;
+        iteration++;
+    } while (rmsd > nbs_threshold);
+        
+    ext_tree.summarizeLittleBootstrapSupport();
+    string out_file = treefile_name;
+
+    ext_tree.printTree(out_file.c_str());
+    cout << "Tree with assigned support written to " << out_file
+            << endl;
+
+    // restore branch tests
+    params.aLRT_replicates = saved_aLRT_replicates;
+    params.localbp_replicates = saved_localbp_replicates;
+    params.aLRT_test = saved_aLRT_test;
+    params.aBayes_test = saved_aBayes_test;
+
+    if (MPIHelper::getInstance().isMaster()) {
+        cout << "Total CPU time for " << RESAMPLE_NAME << ": " << (getCPUTime() - start_time) << " seconds." << endl;
+        cout << "Total wall-clock time for " << RESAMPLE_NAME << ": " << (getRealTime() - start_real_time) << " seconds." << endl << endl;
+        cout << "Non-parametric " << RESAMPLE_NAME << " results written to:" << endl;
+        if (params.print_bootaln)
+            cout << RESAMPLE_NAME_I << " alignments:     " << params.out_prefix << ".bootaln" << endl;
+        cout << "  " << RESAMPLE_NAME_I << " trees:          " << params.out_prefix << ".boottrees" << endl;
+        cout << endl;
+    }
+    delete model_info;
+}
+
+void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) {
+    ModelCheckpoint *model_info = new ModelCheckpoint;
+    StrVector removed_seqs, twin_seqs;
+    
+    string treefile_name = params.out_prefix;
+    treefile_name += ".treefile";
+    string boottrees_name = params.out_prefix;
+    boottrees_name += ".ufboot";
+    string bootaln_name = params.out_prefix;
+    bootaln_name += ".bootaln";
+    string bootlh_name = params.out_prefix;
+    bootlh_name += ".bootlh";
+    int bootSample = 0;
+    if (tree->getCheckpoint()->get("bootSample", bootSample)) {
+        cout << "CHECKPOINT: " << bootSample << " bootstrap analyses restored" << endl;
+    } else if (MPIHelper::getInstance().isMaster()) {
+        // first empty the boottrees file
+        try {
+            ofstream tree_out;
+            tree_out.exceptions(ios::failbit | ios::badbit);
+            tree_out.open(boottrees_name.c_str());
+            tree_out.close();
+        } catch (ios::failure) {
+            outError(ERR_WRITE_OUTPUT, boottrees_name);
+        }
+
+        // empty the bootaln file
+        if (params.print_bootaln)
+        try {
+            ofstream tree_out;
+            tree_out.exceptions(ios::failbit | ios::badbit);
+            tree_out.open(bootaln_name.c_str());
+            tree_out.close();
+        } catch (ios::failure) {
+            outError(ERR_WRITE_OUTPUT, bootaln_name);
+        }
+    }
+
+    double start_time = getCPUTime();
+    double start_real_time = getRealTime();
+
+    startTreeReconstruction(params, tree, *model_info);
+    
+    // 2018-06-21: bug fix: alignment might be changed by -m ...MERGE
+    alignment = tree->aln;
+
+    if (params.compute_ml_tree) {
+        cout << endl << "===> START ANALYSIS ON THE ORIGINAL ALIGNMENT" << endl << endl;
+        if (params.num_runs == 1)
+            runTreeReconstruction(params, tree);
+        else
+            runMultipleTreeReconstruction(params, tree->aln, tree);
+    }
+
+    // turn off all branch tests
+    int saved_aLRT_replicates = params.aLRT_replicates;
+    int saved_localbp_replicates = params.localbp_replicates;
+    bool saved_aLRT_test = params.aLRT_test;
+    bool saved_aBayes_test = params.aBayes_test;
+    int saved_gbo_replicates = params.gbo_replicates;
+    ConsensusType saved_consensus_type = params.consensus_type;
+    STOP_CONDITION saved_stop_condition = params.stop_condition;
+    int saved_print_ufboot_trees = params.print_ufboot_trees;
+
+    params.aLRT_replicates = 0;
+    params.localbp_replicates = 0;
+    params.aLRT_test = false;
+    params.aBayes_test = false;
+    params.gbo_replicates = params.num_bootstrap_samples;
+    params.consensus_type = CT_CONSENSUS_TREE;
+    params.stop_condition = SC_BOOTSTRAP_CORRELATION;
+    params.print_ufboot_trees = 2;
+
+    MExtTree ext_tree;
+    cout << "Reading tree " << treefile_name.c_str() << " ..." << endl;
+    bool is_rooted;
+    ext_tree.init(treefile_name.c_str(), is_rooted);
+    
+    // do bootstrap analysis
+
+    double nbs_threshold = 0.05;
+    std::vector<double> last_weights_vec;
+    double rmsd;
+    int iteration = 0;
+    do {
+        cout << endl << "===> ITERATION: " << iteration + 1 << endl << endl;
+
+        IQTree *boot_tree;
+        if (alignment->isSuperAlignment()){
+            if(params.partition_type != BRLEN_OPTIMIZE){
+                boot_tree = new PhyloSuperTreePlen((SuperAlignment*) alignment, (PhyloSuperTree*) tree);
+            } else {
+                boot_tree = new PhyloSuperTree((SuperAlignment*) alignment, (PhyloSuperTree*) tree);
+            }
+        } else {
+            // allocate heterotachy tree if neccessary
+            int pos = posRateHeterotachy(alignment->model_name);
+            
+            if (params.num_mixlen > 1) {
+                boot_tree = new PhyloTreeMixlen(alignment, params.num_mixlen);
+            } else if (pos != string::npos) {
+                boot_tree = new PhyloTreeMixlen(alignment, 0);
+            } else
+                boot_tree = new IQTree(alignment);
+        }
+
+        if (!tree->constraintTree.empty()) {
+            boot_tree->constraintTree.readConstraint(tree->constraintTree);
+        }
+
+        // set checkpoint
+        boot_tree->setCheckpoint(tree->getCheckpoint());
+        boot_tree->num_precision = tree->num_precision;
+
+        runTreeReconstruction(params, boot_tree);
+        // read in the output tree file
+        stringstream ss;
+        boot_tree->printTree(ss);
+
+        if (MPIHelper::getInstance().isMaster())
+        try {
+            ofstream tree_out;
+            tree_out.exceptions(ios::failbit | ios::badbit);
+            tree_out.open(boottrees_name.c_str(), ios_base::out | ios_base::app);
+            tree_out << ss.str() << endl;
+            tree_out.close();
+        } catch (ios::failure) {
+            outError(ERR_WRITE_OUTPUT, boottrees_name);
+        }
+
+        if (params.num_bootstrap_samples == 1)
+            reportPhyloAnalysis(params, *boot_tree, *model_info);
+
+        delete boot_tree;
+
+        std::vector<double> weights_vec;
+
+        if (params.compute_ml_tree) {
+            if (MPIHelper::getInstance().isMaster()) {
+                cout << endl << "===> ASSIGN " << RESAMPLE_NAME_UPPER
+                    << " SUPPORTS TO THE TREE FROM ORIGINAL ALIGNMENT" << endl << endl;
+
+                assignLittleBootstrapSupport(boottrees_name.c_str(), 0, 1e6,
+                        treefile_name.c_str(), false, treefile_name.c_str(),
+                        params.out_prefix, ext_tree, NULL, &params, iteration, weights_vec);   
+            }
+        } else cout << endl; 
+
+        if (last_weights_vec.empty()) {
+            rmsd = DBL_MAX;
+        } else {
+            assert(last_weights_vec.size() == weights_vec.size());
+            double sum_sq = 0.0;
+            for (size_t i = 0; i < weights_vec.size(); i++) {
+                double diff = (weights_vec[i] - last_weights_vec[i]) / 100;
+                sum_sq += diff * diff;
+            }
+            rmsd = sqrt(sum_sq / weights_vec.size());
+        }
+        std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
+        last_weights_vec = weights_vec;
+        iteration++;
+    } while (rmsd > nbs_threshold);
+        
+    ext_tree.summarizeLittleBootstrapSupport();
+    string out_file = treefile_name;
+
+    ext_tree.printTree(out_file.c_str());
+    cout << "Tree with assigned support written to " << out_file
+            << endl;
+
+    // restore parameters
+    params.aLRT_replicates = saved_aLRT_replicates;
+    params.localbp_replicates = saved_localbp_replicates;
+    params.aLRT_test = saved_aLRT_test;
+    params.aBayes_test = saved_aBayes_test;
+    params.gbo_replicates = saved_gbo_replicates;
+    params.consensus_type = saved_consensus_type;
+    params.stop_condition = saved_stop_condition;
+    params.print_ufboot_trees = saved_print_ufboot_trees;
+
+    if (MPIHelper::getInstance().isMaster()) {
+        cout << "Total CPU time for " << RESAMPLE_NAME << ": " << (getCPUTime() - start_time) << " seconds." << endl;
+        cout << "Total wall-clock time for " << RESAMPLE_NAME << ": " << (getRealTime() - start_real_time) << " seconds." << endl << endl;
+        cout << "Non-parametric " << RESAMPLE_NAME << " results written to:" << endl;
+        if (params.print_bootaln)
+            cout << RESAMPLE_NAME_I << " alignments:     " << params.out_prefix << ".bootaln" << endl;
+        cout << "  " << RESAMPLE_NAME_I << " trees:          " << params.out_prefix << ".boottrees" << endl;
+        cout << endl;
+    }
+    delete model_info;
+}
+
 void convertAlignment(Params &params, IQTree *iqtree) {
     Alignment *alignment = iqtree->aln;
     if (params.num_bootstrap_samples || params.print_bootaln) {
@@ -5364,7 +5767,12 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint, IQTree *&tree, Ali
 //            outError("-m TESTMERGE is not allowed when doing standard bootstrap. Please first\nfind partition scheme on the original alignment and use it for bootstrap analysis");
         if (alignment->getNSeq() < 4)
             outError("It makes no sense to perform bootstrap with less than 4 sequences.");
-        runStandardBootstrap(params, alignment, tree);
+        if (params.fnbs) 
+            runLittleBootstrapFast(params, alignment, tree);
+        else if (params.nbs) 
+            runLittleBootstrap(params, alignment, tree);
+        else
+            runStandardBootstrap(params, alignment, tree);
     }
 
 //    if (params.upper_bound) {
@@ -6056,6 +6464,106 @@ void assignBootstrapSupport(const char *input_trees, int burnin, int max_count,
     cout << "Support values written to " << out_file << endl;
     */
 }
+
+
+/**
+ * assign split occurence frequencies from a set of input trees onto a target tree
+ * NOTE: input trees must have the same taxon set
+ * @param input_trees file containing NEWICK tree strings
+ * @param burnin number of beginning trees to discard
+ * @param max_count max number of trees to read in
+ * @param target_tree the target tree
+ * @param rooted TRUE if trees are rooted, false for unrooted trees
+ * @param output_file file name to write output tree with assigned support values
+ * @param out_prefix prefix of output file
+ * @param mytree (OUT) resulting tree with support values assigned from target_tree
+ * @param tree_weight_file file containing INTEGER weights of input trees
+ * @param params program parameters
+ */
+void assignLittleBootstrapSupport(const char *input_trees, int burnin, int max_count,
+        const char *target_tree, bool rooted, const char *output_tree,
+        const char *out_prefix, MExtTree &mytree, const char* tree_weight_file,
+        Params *params, int iteration, std::vector<double> &weights_vec) {
+    bool myrooted = rooted;
+    weights_vec.clear();
+    // reindex the taxa in the tree to aphabetical names
+    NodeVector taxa;
+    mytree.getTaxa(taxa);
+    sort(taxa.begin(), taxa.end(), nodenamecmp);
+    int i = 0;
+    for (NodeVector::iterator it = taxa.begin(); it != taxa.end(); it++) {
+        (*it)->id = i++;
+    }
+
+    /*
+     string filename = params.boot_trees;
+     filename += ".nolen";
+     boot_trees.printTrees(filename.c_str(), false);
+     return;
+     */
+    SplitGraph sg;
+    SplitIntMap hash_ss;
+    // make the taxa name
+    vector<string> taxname;
+    taxname.resize(mytree.leafNum);
+    mytree.getTaxaName(taxname);
+
+    // read the bootstrap tree file
+    double scale = 100.0;
+    if (params->scaling_factor > 0)
+        scale = params->scaling_factor;
+
+    MTreeSet boot_trees;
+    if (params && detectInputFile(input_trees) == IN_NEXUS) {
+        sg.init(*params);
+        for (SplitGraph::iterator it = sg.begin(); it != sg.end(); it++)
+            hash_ss.insertSplit((*it), (*it)->getWeight());
+        StrVector sgtaxname;
+        sg.getTaxaName(sgtaxname);
+        i = 0;
+        for (StrVector::iterator sit = sgtaxname.begin();
+                sit != sgtaxname.end(); sit++, i++) {
+            Node *leaf = mytree.findLeafName(*sit);
+            if (!leaf)
+                outError("Tree does not contain taxon ", *sit);
+            leaf->id = i;
+        }
+        scale /= sg.maxWeight();
+    } else {
+        myrooted = rooted;
+        boot_trees.init(input_trees, myrooted, burnin, max_count,
+                        tree_weight_file);
+        if (mytree.rooted != boot_trees.isRooted())
+            outError("Target tree and tree set have different rooting");
+        if (boot_trees.equal_taxon_set) {
+            boot_trees.convertSplits(taxname, sg, hash_ss, SW_COUNT, -1, params->support_tag);
+            scale /= boot_trees.sumTreeWeights();
+        }
+    }
+    //sg.report(cout);
+    if (!sg.empty()) {
+        cout << "Rescaling split weights by " << scale << endl;
+        if (params->scaling_factor < 0)
+            sg.scaleWeight(scale, true);
+        else {
+            sg.scaleWeight(scale, false, params->numeric_precision);
+        }
+
+        cout << sg.size() << " splits found" << endl;
+    }
+    // compute the percentage of appearance
+    //    printSplitSet(sg, hash_ss);
+    //sg.report(cout);
+    cout << "Creating " << RESAMPLE_NAME << " support values..." << endl;
+    if (!sg.empty())
+        mytree.createLittleBootstrapSupport(taxname, boot_trees, hash_ss, params->support_tag, iteration, weights_vec);
+    else {
+        cout << "Unequal taxon sets, rereading trees..." << endl;
+        DoubleVector rfdist;
+        mytree.computeRFDist(input_trees, rfdist, 1);
+    }
+}
+
 
 void computeConsensusTree(const char *input_trees, int burnin, int max_count,
         double cutoff, double weight_threshold, const char *output_tree,

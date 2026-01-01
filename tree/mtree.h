@@ -934,6 +934,12 @@ public:
 	void createBootstrapSupport(vector<string> &taxname, MTreeSet &trees, SplitIntMap &hash_ss, char *tag,
 		Node *node = NULL, Node *dad = NULL);
 
+        void createLittleBootstrapSupport(vector<string> &taxname, MTreeSet &trees, SplitIntMap &hash_ss, char *tag,
+                int iteration, std::vector<double>& weights_vec, Node *node = NULL, Node *dad = NULL);
+        
+        void summarizeLittleBootstrapSupport(Node *node = NULL, Node *dad = NULL);
+
+
 	void reportDisagreedTrees(vector<string> &taxname, MTreeSet &trees, Split &mysplit);
 
 

@@ -2781,6 +2781,46 @@ void MTree::createBootstrapSupport(vector<string> &taxname, MTreeSet &trees, Spl
 	}	
 }
 
+void MTree::createLittleBootstrapSupport(vector<string> &taxname, MTreeSet &trees, SplitIntMap &hash_ss,
+    char *tag, int iteration, std::vector<double>& weights, Node *node, Node *dad) {
+	if (!node) node = root;	
+	FOR_NEIGHBOR_IT(node, dad, it) {
+		if (!node->isLeaf() && !(*it)->node->isLeaf()) {
+			vector<int> taxa;
+			getTaxaID(taxa, (*it)->node, node);
+			Split mysplit(leafNum, 0.0, taxa);
+			if (mysplit.shouldInvert())
+				mysplit.invert();
+			Split *sp = hash_ss.findSplit(&mysplit);
+            double weight = (sp != NULL) ? sp->getWeight() : 0.0;
+            double new_weight = ((*it)->node->supportValue * iteration + weight) / (iteration + 1);
+            std::cerr << (*it)->node->name << " old: " << (*it)->node->supportValue << " new: " << weight << " combined: " << new_weight << std::endl;
+            (*it)->node->supportValue = new_weight;
+            weights.push_back(new_weight);
+		}
+		createLittleBootstrapSupport(taxname, trees, hash_ss, tag, iteration, weights, (*it)->node, node);
+	}	
+}
+
+void MTree::summarizeLittleBootstrapSupport(Node *node, Node *dad) {
+	if (!node) node = root;	
+	FOR_NEIGHBOR_IT(node, dad, it) {
+		if (!node->isLeaf() && !(*it)->node->isLeaf()) {
+            double weight = (*it)->node->supportValue;
+
+            stringstream tmp;
+            if ((*it)->node->name.empty())
+                tmp << weight;
+            else
+                tmp << "/" << weight;
+                
+            // assign tag          
+            (*it)->node->name.append(tmp.str());
+		}
+		summarizeLittleBootstrapSupport((*it)->node, node);
+	}	
+}
+
 void MTree::removeNode(Node *dad, Node *node) {
 //    Node *child = (*it)->node;
     bool first = true;
