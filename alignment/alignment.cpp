@@ -4227,6 +4227,92 @@ void Alignment::createBootstrapAlignment(Alignment *aln, IntVector* pattern_freq
 //    buildSeqStates();
 }
 
+void Alignment::createBootstrapAlignment(Alignment *aln,  const IntVector& candidate_sites, IntVector* pattern_freq) {
+    if (aln->isSuperAlignment()) outError("Internal error: ", __func__);
+    name = aln->name;
+    model_name = aln->model_name;
+    sequence_type = aln->sequence_type;
+    position_spec = aln->position_spec;
+    aln_file = aln->aln_file;
+    size_t nsite = aln->getNSite();
+    seq_names.insert(seq_names.begin(), aln->seq_names.begin(), aln->seq_names.end());
+    num_states = aln->num_states;
+    seq_type = aln->seq_type;
+    genetic_code = aln->genetic_code;
+    if (seq_type == SEQ_CODON) {
+    	codon_table = new char[num_states];
+    	memcpy(codon_table, aln->codon_table, num_states);
+    	non_stop_codon = new char[strlen(genetic_code)];
+    	memcpy(non_stop_codon, aln->non_stop_codon, strlen(genetic_code));
+    }
+    STATE_UNKNOWN = aln->STATE_UNKNOWN;
+    site_pattern.resize(nsite, -1);
+    clear();
+    pattern_index.clear();
+
+    // 2016-07-05: copy variables for PoMo
+    pomo_sampled_states = aln->pomo_sampled_states;
+    pomo_sampled_states_index = aln->pomo_sampled_states_index;
+    pomo_sampling_method = aln->pomo_sampling_method;
+    virtual_pop_size = aln->virtual_pop_size;
+
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN); // to avoid printing gappy sites in addPattern
+    if (pattern_freq) {
+        pattern_freq->resize(0);
+        pattern_freq->resize(aln->getNPattern(), 0);
+    }
+
+	IntVector site_vec;
+    // little bootstrap
+    int added_sites = 0;
+    int resample_size = candidate_sites.size();
+    IntVector sample;
+    random_resampling(nsite, resample_size, sample);
+    for (size_t site = 0; site < resample_size; ++site) {
+        for (int rep = 0; rep < sample[site]; ++rep) {
+            int ptn_id = aln->getPatternID(candidate_sites[site]);
+            Pattern pat = aln->at(ptn_id);
+            int nptn = getNPattern();
+            addPattern(pat, added_sites);
+            if (!aln->site_state_freq.empty() && getNPattern() > nptn) {
+                // a new pattern is added, copy state frequency vector
+                double *state_freq = new double[num_states];
+                memcpy(state_freq, aln->site_state_freq[ptn_id], num_states*sizeof(double));
+                site_state_freq.push_back(state_freq);
+            }
+            if (pattern_freq) ((*pattern_freq)[ptn_id])++;
+            added_sites++;
+        }
+    }
+    if (added_sites < nsite)
+        site_pattern.resize(added_sites);
+    if (!aln->site_state_freq.empty()) {
+        site_model = site_pattern;
+        ASSERT(site_state_freq.size() == getNPattern());
+    }
+    verbose_mode = save_mode;
+    countConstSite();
+//    buildSeqStates();
+}
+
+void Alignment::createBootstrapAlignment(const IntVector& candidate_sites, IntVector& pattern_freq, int *rstream) {
+    size_t nsite = getNSite();
+    pattern_freq.resize(nsite, 0);
+	IntVector site_vec;
+
+    size_t nptn = getNPattern();
+    int resample_size = candidate_sites.size();
+    
+    IntVector sample;
+    random_resampling(nsite, resample_size, sample, rstream);
+    for (size_t site = 0; site < resample_size; site++) {
+        int ptn_id = getPatternID(candidate_sites[site]);
+        pattern_freq[ptn_id] += sample[site];
+    }
+}
+
+
 void Alignment::createBootstrapAlignment(IntVector &pattern_freq, const char *spec) {
 	int nptn = getNPattern();
     pattern_freq.resize(nptn, 0);

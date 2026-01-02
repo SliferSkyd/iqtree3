@@ -4859,12 +4859,18 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     int iteration = 0;
     do {
         cout << endl << "===> ITERATION: " << iteration + 1 << endl << endl;
+
+        IntVector candidate_sites;
+        // generate candidate sites for little bootstrap
+        int little_bs_size = (int)(alignment->getNSite() * params.nbs_prop);
+        std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
+                    << little_bs_size << " (" << params.nbs_prop*100 << "% of total "
+                    << alignment->getNSite() << " sites)..." << std::endl;
+        random_resampling(alignment->getNSite(), little_bs_size, candidate_sites, true, randstream);
         for (int sample = bootSample; sample < params.num_bootstrap_samples; sample++) {
             cout << endl << "===> START " << RESAMPLE_NAME_UPPER << " REPLICATE NUMBER "
                     << sample + 1 << endl << endl;
 
-            // 2015-12-17: initialize random stream for creating bootstrap samples
-            // mainly so that checkpointing does not need to save bootstrap samples
             int *saved_randstream = randstream;
             init_random(params.ran_seed + sample);
 
@@ -4875,7 +4881,7 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
                 bootstrap_alignment = new SuperAlignment;
             else
                 bootstrap_alignment = new Alignment;
-            bootstrap_alignment->createBootstrapAlignment(alignment, NULL, params.bootstrap_spec);
+            bootstrap_alignment->createBootstrapAlignment(alignment, candidate_sites, NULL);
 
             // restore randstream
             finish_random();
@@ -5154,6 +5160,10 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
         std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
         last_weights_vec = weights_vec;
         iteration++;
+
+        tree->getCheckpoint()->keepKeyPrefix("iqtree");
+        tree->getCheckpoint()->putBool("finished", false);
+        tree->getCheckpoint()->dump(true);
     } while (rmsd > nbs_threshold);
         
     ext_tree.summarizeLittleBootstrapSupport();

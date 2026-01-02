@@ -4528,6 +4528,25 @@ void parseArg(int argc, char *argv[], Params &params) {
 				params.fnbs = true;
 				continue;
 			}
+            if (strcmp(argv[cnt], "--nbs-prop") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-prop <proportion>";
+                params.nbs_prop = convert_double(argv[cnt]);
+                if (params.nbs_prop < 0.0 || params.nbs_prop > 1.0)
+                    throw "Little bootstrap proportion must be between 0.0 and 1.0";
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-cutoff") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-cutoff <threshold>";
+                params.nbs_cutoff = convert_double(argv[cnt]);
+                if (params.nbs_cutoff <= 0.0 || params.nbs_cutoff >= 1.0)
+                    throw "Little bootstrap cutoff must be between 0.0 and 1.0";
+                continue;
+            }
+
 			if (strcmp(argv[cnt], "-u2c_nni5") == 0) {
 				params.u2c_nni5 = true;
 				continue;
@@ -6363,8 +6382,6 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --nstep NUM          Iterations for UFBoot stopping rule (default: 100)" << endl
     << "  --bcor NUM           Minimum correlation coefficient (default: 0.99)" << endl
     << "  --beps NUM           RELL epsilon to break tie (default: 0.5)" << endl
-    << "  --nbs                Use little bootstrap" << endl 
-    << "  --fnbs               Use fast little bootstrap" << endl
     << "  --bnni               Optimize UFBoot trees by NNI on bootstrap alignment" << endl
     << endl << "NON-PARAMETRIC BOOTSTRAP/JACKKNIFE:" << endl
     << "  -b, --boot NUM       Replicates for bootstrap + ML tree + consensus tree" << endl
@@ -6372,6 +6389,14 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --jack-prop NUM      Subsampling proportion for jackknife (default: 0.5)" << endl
     << "  --bcon NUM           Replicates for bootstrap + consensus tree" << endl
     << "  --bonly NUM          Replicates for bootstrap only" << endl
+
+    << endl << "LITTLE BOOTSTRAP:" << endl
+    << "  -b, --boot NUM       Replicates for bootstrap + ML tree" << endl
+    << "  --nbs                Use little bootstrap" << endl 
+    << "  --fnbs               Use fast little bootstrap" << endl
+    << "  --nbs-prop NUM       Subsampling proportion for little bootstrap (default: 0.05)" << endl
+    << "  --nbs-threshold NUM  RMSD threshold for convergence (default: 0.05)" << endl
+
 #ifdef USE_BOOSTER
     << "  --tbe                Transfer bootstrap expectation" << endl
 #endif
@@ -7417,6 +7442,29 @@ void random_resampling(int n, IntVector &sample, int *rstream) {
     }
 }
 
+void random_resampling(int n, int m, IntVector &sample, bool replacement, int *rstream) {
+
+    std::cout << "m = " << m << ", n = " << n << ", replacement = " << replacement << std::endl;
+    // little bootstrap resampling
+    sample.resize(m, 0);
+    if (!replacement) {
+        for (int i = 0; i < n; i++) {
+            int j = random_int(m, rstream);
+            std::cout << "i = " << i << ", j = " << j << std::endl;
+            sample[j]++;            
+        }
+    } else {
+        IntVector indices(n);
+        for (int i = 0; i < n; i++)
+            indices[i] = i;
+        my_random_shuffle(indices.begin(), indices.end());
+        for (int i = 0; i < m; i++) {
+            sample[i] = indices[i];
+        }
+    }
+    std::cout << "end random_resampling" << std::endl;
+}
+
 
 /* Following part is taken from ModelTest software */
 #define	BIGX            20.0                                 /* max value to represent exp (x) */
@@ -7933,6 +7981,8 @@ void Params::setDefault() {
     ufboot2corr = false;
     nbs = false;
     fnbs = false;
+    nbs_cutoff = 0.05;
+    nbs_prop = 0.05;
     u2c_nni5 = false;
     date_with_outgroup = true;
     date_debug = false;

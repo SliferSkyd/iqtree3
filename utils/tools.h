@@ -2495,6 +2495,8 @@ public:
 
     bool nbs; // to turn on NBS, enabled by "-nbs"
     bool fnbs; // to turn on fast NBS, enabled by "-fnbs"
+    double nbs_prop; // proportion of sites to sample in each replicate, default 0.05
+    double nbs_cutoff; // threshold for RMSD to stop NBS iterations, default 0.05
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
 
@@ -3567,6 +3569,16 @@ void my_random_shuffle (T first, T last, int *rstream = NULL)
  @param rstream random number generator stream
 */
 void random_resampling(int n, IntVector &sample, int *rstream = NULL);
+
+/**
+ random resampling for little bootstrap
+ @param n sample size
+ @param m size of each resample
+ @param[in/out] sample array of size n with frequency of resampling
+ @param replacement TRUE if sampling with replacement, FALSE otherwise
+ @param rstream random number generator stream
+*/
+void random_resampling(int n, int m, IntVector &sample, bool replacement = false, int *rstream = NULL);
 
 #define RESAMPLE_NAME ((Params::getInstance().jackknife_prop == 0.0) ? "bootstrap" : "jackknife")
 #define RESAMPLE_NAME_I ((Params::getInstance().jackknife_prop == 0.0) ? "Bootstrap" : "Jackknife")
