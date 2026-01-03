@@ -1396,6 +1396,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.max_candidate_trees = 0;
     params.distinct_trees = false;
     params.online_bootstrap = true;
+    params.nbs_cutoff = 0.05;
+    params.nbs_prop = 0.05;
     params.min_correlation = 0.99;
     params.step_iterations = 100;
 //    params.store_candidate_trees = false;
@@ -6395,7 +6397,7 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --nbs                Use little bootstrap" << endl 
     << "  --fnbs               Use fast little bootstrap" << endl
     << "  --nbs-prop NUM       Subsampling proportion for little bootstrap (default: 0.05)" << endl
-    << "  --nbs-threshold NUM  RMSD threshold for convergence (default: 0.05)" << endl
+    << "  --nbs-cutoff NUM     RMSD threshold for convergence (default: 0.05)" << endl
 
 #ifdef USE_BOOSTER
     << "  --tbe                Transfer bootstrap expectation" << endl

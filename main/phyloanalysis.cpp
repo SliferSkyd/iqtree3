@@ -4852,8 +4852,6 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     ext_tree.init(treefile_name.c_str(), is_rooted);
     
     // do bootstrap analysis
-
-    double nbs_threshold = 0.05;
     std::vector<double> last_weights_vec;
     double rmsd;
     int iteration = 0;
@@ -4971,7 +4969,7 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
         std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
         last_weights_vec = weights_vec;
         iteration++;
-    } while (rmsd > nbs_threshold);
+    } while (rmsd > params.nbs_cutoff);
         
     ext_tree.summarizeLittleBootstrapSupport();
     string out_file = treefile_name;
@@ -5078,7 +5076,6 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     
     // do bootstrap analysis
 
-    double nbs_threshold = 0.05;
     std::vector<double> last_weights_vec;
     double rmsd;
     int iteration = 0;
@@ -5164,7 +5161,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
         tree->getCheckpoint()->keepKeyPrefix("iqtree");
         tree->getCheckpoint()->putBool("finished", false);
         tree->getCheckpoint()->dump(true);
-    } while (rmsd > nbs_threshold);
+    } while (rmsd > params.nbs_cutoff);
         
     ext_tree.summarizeLittleBootstrapSupport();
     string out_file = treefile_name;
