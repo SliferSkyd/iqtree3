@@ -1397,7 +1397,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.distinct_trees = false;
     params.online_bootstrap = true;
     params.nbs_cutoff = 0.05;
-    params.nbs_prop = 0.05;
+    params.nbs_prop = 0;
+    params.nbs_min_iter = 5;
     params.min_correlation = 0.99;
     params.step_iterations = 100;
 //    params.store_candidate_trees = false;
@@ -4535,7 +4536,7 @@ void parseArg(int argc, char *argv[], Params &params) {
                 if (cnt >= argc)
                     throw "Use --nbs-prop <proportion>";
                 params.nbs_prop = convert_double(argv[cnt]);
-                if (params.nbs_prop < 0.0 || params.nbs_prop > 1.0)
+                if (params.nbs_prop <= 0.0 || params.nbs_prop > 1.0)
                     throw "Little bootstrap proportion must be between 0.0 and 1.0";
                 continue;
             }
@@ -4546,6 +4547,15 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.nbs_cutoff = convert_double(argv[cnt]);
                 if (params.nbs_cutoff <= 0.0 || params.nbs_cutoff >= 1.0)
                     throw "Little bootstrap cutoff must be between 0.0 and 1.0";
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-min-iter") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-min-iter <min_iterations>";
+                params.nbs_min_iter = convert_double(argv[cnt]);
+                if (params.nbs_min_iter < 0)
+                    throw "Number of little bootstrap iterations must be non-negative";
                 continue;
             }
 
@@ -7445,14 +7455,11 @@ void random_resampling(int n, IntVector &sample, int *rstream) {
 }
 
 void random_resampling(int n, int m, IntVector &sample, bool replacement, int *rstream) {
-
-    std::cout << "m = " << m << ", n = " << n << ", replacement = " << replacement << std::endl;
     // little bootstrap resampling
     sample.resize(m, 0);
     if (!replacement) {
         for (int i = 0; i < n; i++) {
             int j = random_int(m, rstream);
-            std::cout << "i = " << i << ", j = " << j << std::endl;
             sample[j]++;            
         }
     } else {
@@ -7464,7 +7471,21 @@ void random_resampling(int n, int m, IntVector &sample, bool replacement, int *r
             sample[i] = indices[i];
         }
     }
-    std::cout << "end random_resampling" << std::endl;
+}
+
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, double exp) {
+    double exponent = exp;
+    if (exp <= 0) {
+        if (nsites < 10000) {
+            exponent = 0.9;
+        } else if (nsites < 100000) {
+            exponent = 0.8;
+        } else {
+            exponent = 0.7;
+        }
+    }
+    std::cout << "INFO: Little bootstrap subsample size set to nsites^" << convertDoubleToString(exponent) << " = " << convertDoubleToString(pow((double)nsites, exponent)) << " sites." << std::endl;
+    return (size_t) pow((double)nsites, exponent);
 }
 
 
@@ -7984,7 +8005,8 @@ void Params::setDefault() {
     nbs = false;
     fnbs = false;
     nbs_cutoff = 0.05;
-    nbs_prop = 0.05;
+    nbs_prop = 0;
+    nbs_min_iter = 5;
     u2c_nni5 = false;
     date_with_outgroup = true;
     date_debug = false;

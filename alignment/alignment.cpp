@@ -4297,11 +4297,12 @@ void Alignment::createBootstrapAlignment(Alignment *aln,  const IntVector& candi
 }
 
 void Alignment::createBootstrapAlignment(const IntVector& candidate_sites, IntVector& pattern_freq, int *rstream) {
+    size_t nptn = getNPattern();
     size_t nsite = getNSite();
-    pattern_freq.resize(nsite, 0);
+
+    pattern_freq.resize(nptn, 0);
 	IntVector site_vec;
 
-    size_t nptn = getNPattern();
     int resample_size = candidate_sites.size();
     
     IntVector sample;

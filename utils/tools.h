@@ -2495,8 +2495,9 @@ public:
 
     bool nbs; // to turn on NBS, enabled by "-nbs"
     bool fnbs; // to turn on fast NBS, enabled by "-fnbs"
-    double nbs_prop; // proportion of sites to sample in each replicate, default 0.05
+    double nbs_prop; // proportion of sites to sample in each replicate, default 0
     double nbs_cutoff; // threshold for RMSD to stop NBS iterations, default 0.05
+    double nbs_min_iter; // number of initial subsamples used to compute initial RMSD, default 5
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
 
@@ -3579,6 +3580,14 @@ void random_resampling(int n, IntVector &sample, int *rstream = NULL);
  @param rstream random number generator stream
 */
 void random_resampling(int n, int m, IntVector &sample, bool replacement = false, int *rstream = NULL);
+
+/**
+ * Determine the subsample size for little bootstrap
+ * @param nsites total number of sites
+ * @param exp exponent for subsample size calculation
+ * @return subsample size
+ */
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, double exp);
 
 #define RESAMPLE_NAME ((Params::getInstance().jackknife_prop == 0.0) ? "bootstrap" : "jackknife")
 #define RESAMPLE_NAME_I ((Params::getInstance().jackknife_prop == 0.0) ? "Bootstrap" : "Jackknife")

@@ -373,9 +373,9 @@ void IQTree::initSettings(Params &params) {
 
         if (params.fnbs) {
             // generate candidate sites for little bootstrap
-            int little_bs_size = (int)(aln->getNSite() * params.nbs_prop);
+            int little_bs_size = determineLittleBootstrapSubsampleSize(aln->getNSite(), params.nbs_prop);
             std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
-                      << little_bs_size << " (" << params.nbs_prop*100 << "% of total "
+                      << little_bs_size << " (" << (double)little_bs_size / aln->getNSite() * 100 << "% of total "
                       << aln->getNSite() << " sites)..." << std::endl;
             random_resampling(aln->getNSite(), little_bs_size, candidate_sites, true, randstream);
             /*

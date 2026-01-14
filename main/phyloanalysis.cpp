@@ -4850,7 +4850,7 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     cout << "Reading tree " << treefile_name.c_str() << " ..." << endl;
     bool is_rooted;
     ext_tree.init(treefile_name.c_str(), is_rooted);
-    
+
     // do bootstrap analysis
     std::vector<double> last_weights_vec;
     double rmsd;
@@ -4860,9 +4860,9 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
 
         IntVector candidate_sites;
         // generate candidate sites for little bootstrap
-        int little_bs_size = (int)(alignment->getNSite() * params.nbs_prop);
+        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), params.nbs_prop);
         std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
-                    << little_bs_size << " (" << params.nbs_prop*100 << "% of total "
+                    << little_bs_size << " (" << (double)little_bs_size / alignment->getNSite() * 100 << "% of total "
                     << alignment->getNSite() << " sites)..." << std::endl;
         random_resampling(alignment->getNSite(), little_bs_size, candidate_sites, true, randstream);
         for (int sample = bootSample; sample < params.num_bootstrap_samples; sample++) {
@@ -4870,10 +4870,10 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
                     << sample + 1 << endl << endl;
 
             int *saved_randstream = randstream;
-            init_random(params.ran_seed + sample);
+            init_random(params.ran_seed + sample + iteration * params.num_bootstrap_samples);
 
             Alignment* bootstrap_alignment;
-            cout << "Creating " << RESAMPLE_NAME << " alignment (seed: " << params.ran_seed+sample << ")..." << endl;
+            cout << "Creating " << RESAMPLE_NAME << " alignment (seed: " << params.ran_seed+sample+iteration*params.num_bootstrap_samples << ")..." << endl;
 
             if (alignment->isSuperAlignment())
                 bootstrap_alignment = new SuperAlignment;
@@ -4969,7 +4969,7 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
         std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
         last_weights_vec = weights_vec;
         iteration++;
-    } while (rmsd > params.nbs_cutoff);
+    } while (rmsd > params.nbs_cutoff || iteration < params.nbs_min_iter);
         
     ext_tree.summarizeLittleBootstrapSupport();
     string out_file = treefile_name;
@@ -5161,7 +5161,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
         tree->getCheckpoint()->keepKeyPrefix("iqtree");
         tree->getCheckpoint()->putBool("finished", false);
         tree->getCheckpoint()->dump(true);
-    } while (rmsd > params.nbs_cutoff);
+    } while (rmsd > params.nbs_cutoff || iteration < params.nbs_min_iter);
         
     ext_tree.summarizeLittleBootstrapSupport();
     string out_file = treefile_name;
