@@ -1399,6 +1399,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.nbs_cutoff = 0.05;
     params.nbs_prop = 0;
     params.nbs_min_iter = 5;
+    params.nbs_tree_file = NULL;
     params.min_correlation = 0.99;
     params.step_iterations = 100;
 //    params.store_candidate_trees = false;
@@ -4558,6 +4559,13 @@ void parseArg(int argc, char *argv[], Params &params) {
                     throw "Number of little bootstrap iterations must be non-negative";
                 continue;
             }
+            if (strcmp(argv[cnt], "--nbs-tree-file") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-tree-file <tree_file>";
+                params.nbs_tree_file = argv[cnt];
+                continue;
+            }
 
 			if (strcmp(argv[cnt], "-u2c_nni5") == 0) {
 				params.u2c_nni5 = true;
@@ -6408,6 +6416,8 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --fnbs               Use fast little bootstrap" << endl
     << "  --nbs-prop NUM       Subsampling proportion for little bootstrap (default: 0.05)" << endl
     << "  --nbs-cutoff NUM     RMSD threshold for convergence (default: 0.05)" << endl
+    << "  --nbs-min-iter NUM   Minimum number of iterations (default: 5)" << endl
+    << "  --nbs-tree-file      User-defined tree file path" << endl
 
 #ifdef USE_BOOSTER
     << "  --tbe                Transfer bootstrap expectation" << endl
@@ -8007,6 +8017,7 @@ void Params::setDefault() {
     nbs_cutoff = 0.05;
     nbs_prop = 0;
     nbs_min_iter = 5;
+    nbs_tree_file = NULL;
     u2c_nni5 = false;
     date_with_outgroup = true;
     date_debug = false;

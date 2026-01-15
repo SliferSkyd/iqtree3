@@ -2498,6 +2498,8 @@ public:
     double nbs_prop; // proportion of sites to sample in each replicate, default 0
     double nbs_cutoff; // threshold for RMSD to stop NBS iterations, default 0.05
     double nbs_min_iter; // number of initial subsamples used to compute initial RMSD, default 5
+    char* nbs_tree_file; // user tree file for NBS, default NULL
+
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
 

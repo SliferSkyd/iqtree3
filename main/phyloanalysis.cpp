@@ -4828,12 +4828,14 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     // 2018-06-21: bug fix: alignment might be changed by -m ...MERGE
     alignment = tree->aln;
 
-    if (params.compute_ml_tree) {
+    if (!params.nbs_tree_file) {
         cout << endl << "===> START ANALYSIS ON THE ORIGINAL ALIGNMENT" << endl << endl;
         if (params.num_runs == 1)
             runTreeReconstruction(params, tree);
         else
             runMultipleTreeReconstruction(params, tree->aln, tree);
+    } else {
+        std::cout << "Using user-supplied tree file " << params.nbs_tree_file << " for little " << RESAMPLE_NAME << " support assignment." << std::endl;
     }
 
     // turn off all branch tests
@@ -4847,9 +4849,10 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     params.aBayes_test = false;
     
     MExtTree ext_tree;
-    cout << "Reading tree " << treefile_name.c_str() << " ..." << endl;
+    std::string input_treefile = params.nbs_tree_file ? params.nbs_tree_file : treefile_name;
+    cout << "Reading tree " << input_treefile << " ..." << endl;
     bool is_rooted;
-    ext_tree.init(treefile_name.c_str(), is_rooted);
+    ext_tree.init(input_treefile.c_str(), is_rooted);
 
     // do bootstrap analysis
     std::vector<double> last_weights_vec;
