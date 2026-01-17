@@ -4850,9 +4850,23 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     
     MExtTree ext_tree;
     std::string input_treefile = params.nbs_tree_file ? params.nbs_tree_file : treefile_name;
-    cout << "Reading tree " << input_treefile << " ..." << endl;
-    bool is_rooted;
-    ext_tree.init(input_treefile.c_str(), is_rooted);
+    cout << "Reading tree " << input_treefile << " (forced unrooted)..." << endl;
+    bool is_rooted = false;
+    ext_tree.init(input_treefile.c_str(), is_rooted, true);
+
+    if (ext_tree.rooted)
+        cout << "rooted tree detected" << endl;
+    else
+        cout << "unrooted tree detected" << endl;
+
+    vector<string> taxname;
+    taxname.resize(ext_tree.leafNum);
+    std::cout << "Leaf number in target tree: " << ext_tree.leafNum << std::endl;
+    std::cout << "Taxa in target tree:" << std::endl;
+    ext_tree.getTaxaName(taxname);
+    for (auto n : taxname) {
+        std::cout << n << std::endl;
+    }
 
     // do bootstrap analysis
     std::vector<double> last_weights_vec;
@@ -5073,10 +5087,15 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     params.print_ufboot_trees = 2;
 
     MExtTree ext_tree;
-    cout << "Reading tree " << treefile_name.c_str() << " ..." << endl;
-    bool is_rooted;
-    ext_tree.init(treefile_name.c_str(), is_rooted);
+    cout << "Reading tree " << treefile_name.c_str() << " (forced unrooted)..." << endl;
+    bool is_rooted = false;
+    ext_tree.init(treefile_name.c_str(), is_rooted, true);
     
+    if (ext_tree.rooted)
+        cout << "rooted tree detected" << endl;
+    else
+        cout << "unrooted tree detected" << endl;
+
     // do bootstrap analysis
 
     std::vector<double> last_weights_vec;
@@ -6543,8 +6562,6 @@ void assignLittleBootstrapSupport(const char *input_trees, int burnin, int max_c
         myrooted = rooted;
         boot_trees.init(input_trees, myrooted, burnin, max_count,
                         tree_weight_file);
-        if (mytree.rooted != boot_trees.isRooted())
-            outError("Target tree and tree set have different rooting");
         if (boot_trees.equal_taxon_set) {
             boot_trees.convertSplits(taxname, sg, hash_ss, SW_COUNT, -1, params->support_tag);
             scale /= boot_trees.sumTreeWeights();

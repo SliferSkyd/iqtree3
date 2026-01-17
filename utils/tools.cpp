@@ -6411,13 +6411,13 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --bonly NUM          Replicates for bootstrap only" << endl
 
     << endl << "LITTLE BOOTSTRAP:" << endl
-    << "  -b, --boot NUM       Replicates for bootstrap + ML tree" << endl
-    << "  --nbs                Use little bootstrap" << endl 
-    << "  --fnbs               Use fast little bootstrap" << endl
-    << "  --nbs-prop NUM       Subsampling proportion for little bootstrap (default: 0.05)" << endl
-    << "  --nbs-cutoff NUM     RMSD threshold for convergence (default: 0.05)" << endl
-    << "  --nbs-min-iter NUM   Minimum number of iterations (default: 5)" << endl
-    << "  --nbs-tree-file      User-defined tree file path" << endl
+    << "  -b, --boot NUM            Replicates for bootstrap + ML tree" << endl
+    << "  --nbs                     Use little bootstrap" << endl 
+    << "  --fnbs                    Use fast little bootstrap" << endl
+    << "  --nbs-prop NUM            Subsampling proportion for little bootstrap (default: 0.05)" << endl
+    << "  --nbs-cutoff NUM          RMSD threshold for convergence (default: 0.05)" << endl
+    << "  --nbs-min-iter NUM        Minimum number of iterations (default: 5)" << endl
+    << "  --nbs-tree-file STRING    User-defined tree file path" << endl
 
 #ifdef USE_BOOSTER
     << "  --tbe                Transfer bootstrap expectation" << endl
