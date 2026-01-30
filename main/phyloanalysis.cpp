@@ -4859,15 +4859,8 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
     else
         cout << "unrooted tree detected" << endl;
 
-    vector<string> taxname;
-    taxname.resize(ext_tree.leafNum);
-    std::cout << "Leaf number in target tree: " << ext_tree.leafNum << std::endl;
-    std::cout << "Taxa in target tree:" << std::endl;
-    ext_tree.getTaxaName(taxname);
-    for (auto n : taxname) {
-        std::cout << n << std::endl;
-    }
-
+    ext_tree.printNexus((string(params.out_prefix)+".nbs_input_tree.nex").c_str());
+    
     // do bootstrap analysis
     std::vector<double> last_weights_vec;
     double rmsd;

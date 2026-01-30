@@ -2826,10 +2826,9 @@ void MTree::createLittleBootstrapSupport(vector<string> &taxname, MTreeSet &tree
 				mysplit.invert();
 			Split *sp = hash_ss.findSplit(&mysplit);
             double weight = (sp != NULL) ? sp->getWeight() : 0.0;
-            double new_weight = ((*it)->node->supportValue * iteration + weight) / (iteration + 1);
-            std::cerr << (*it)->node->name << " old: " << (*it)->node->supportValue << " new: " << weight << " combined: " << new_weight << std::endl;
-            (*it)->node->supportValue = new_weight;
-            weights.push_back(new_weight);
+            std::cerr << (*it)->node->name << " old: " << (*it)->node->supportValue << " new: " << weight << std::endl;
+            (*it)->node->supportValue = weight;
+            weights.push_back(weight);
 		}
 		createLittleBootstrapSupport(taxname, trees, hash_ss, tag, iteration, weights, (*it)->node, node);
 	}	
