@@ -2499,6 +2499,7 @@ public:
     double nbs_cutoff; // threshold for RMSD to stop NBS iterations, default 0.05
     double nbs_min_iter; // number of initial subsamples used to compute initial RMSD, default 5
     char* nbs_tree_file; // user tree file for NBS, default NULL
+    int nbs_site; // number of sites to upsample to
 
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
@@ -3590,6 +3591,15 @@ void random_resampling(int n, int m, IntVector &sample, bool replacement = false
  * @return subsample size
  */
 size_t determineLittleBootstrapSubsampleSize(size_t nsites, double exp);
+
+/**
+ * calculate root mean square deviation between two vectors
+ * @param a first vector
+ * @param b second vector
+ * @param scale scaling factor (default 1.0)
+ * @return RMSD value
+ */
+double calcRMSD(const vector<double> &a, const vector<double> &b, double scale = 1.0);
 
 #define RESAMPLE_NAME ((Params::getInstance().jackknife_prop == 0.0) ? "bootstrap" : "jackknife")
 #define RESAMPLE_NAME_I ((Params::getInstance().jackknife_prop == 0.0) ? "Bootstrap" : "Jackknife")

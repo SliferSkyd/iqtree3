@@ -369,29 +369,6 @@ void IQTree::initSettings(Params &params) {
         BootValType *mem = aligned_alloc<BootValType>(nptn * (size_t)(params.gbo_replicates));
         memset(mem, 0, nptn * (size_t)(params.gbo_replicates) * sizeof(BootValType));
 
-        IntVector candidate_sites;
-
-        if (params.fnbs) {
-            // generate candidate sites for little bootstrap
-            int little_bs_size = determineLittleBootstrapSubsampleSize(aln->getNSite(), params.nbs_prop);
-            std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
-                      << little_bs_size << " (" << (double)little_bs_size / aln->getNSite() * 100 << "% of total "
-                      << aln->getNSite() << " sites)..." << std::endl;
-            random_resampling(aln->getNSite(), little_bs_size, candidate_sites, true, randstream);
-            /*
-            // print candidate sites
-            string candidate_sites_file = params.out_prefix + ".candidate_sites";
-            ofstream csout(candidate_sites_file.c_str());
-            csout << "# Candidate sites for little " << RESAMPLE_NAME << " (total " << little_bs_size << " sites)" << endl;
-            for (size_t csid = 0; csid < candidate_sites.size(); csid++) {
-                for (int f = 0; f < candidate_sites[csid]; f++)
-                    csout << (csid + 1) << "\n";
-            }
-            csout.close();
-            cout << "Candidate sites for little " << RESAMPLE_NAME << " printed to " << candidate_sites_file << endl;
-        */
-        }
-
         for (i = 0; i < params.gbo_replicates; i++)
             boot_samples[i] = mem + i*nptn;
 
@@ -414,7 +391,7 @@ void IQTree::initSettings(Params &params) {
                     bootstrap_alignment = new Alignment;
                 IntVector this_sample;
                 if (params.fnbs) {
-                    aln->createBootstrapAlignment(bootstrap_alignment, candidate_sites, &this_sample);
+                    aln->createLittleBootstrapFastAlignment(bootstrap_alignment, params.nbs_site, &this_sample);
                 } else {
                     aln->createBootstrapAlignment(bootstrap_alignment, &this_sample, params.bootstrap_spec);
                 }
@@ -425,7 +402,7 @@ void IQTree::initSettings(Params &params) {
             } else {
                 IntVector this_sample;
                 if (params.fnbs) {
-                    aln->createBootstrapAlignment(candidate_sites, this_sample);
+                    aln->createLittleBootstrapFastAlignment(params.nbs_site, this_sample);
                 } else {
                     aln->createBootstrapAlignment(this_sample, params.bootstrap_spec);
                 }

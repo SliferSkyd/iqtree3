@@ -4783,6 +4783,10 @@ void runStandardBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
 }
 
 void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
+    if (alignment->isSuperAlignment()) {
+        outError("Little bootstrap not implemented for superalignments");
+    }
+
     ModelCheckpoint *model_info = new ModelCheckpoint;
     StrVector removed_seqs, twin_seqs;
     
@@ -4885,34 +4889,24 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
             Alignment* bootstrap_alignment;
             cout << "Creating " << RESAMPLE_NAME << " alignment (seed: " << params.ran_seed+sample+iteration*params.num_bootstrap_samples << ")..." << endl;
 
-            if (alignment->isSuperAlignment())
-                bootstrap_alignment = new SuperAlignment;
-            else
-                bootstrap_alignment = new Alignment;
-            bootstrap_alignment->createBootstrapAlignment(alignment, candidate_sites, NULL);
+            bootstrap_alignment = new Alignment;
+            bootstrap_alignment->createLittleBootstrapAlignment(alignment, candidate_sites, NULL);
 
             // restore randstream
             finish_random();
             randstream = saved_randstream;
 
             IQTree *boot_tree;
-            if (alignment->isSuperAlignment()){
-                if(params.partition_type != BRLEN_OPTIMIZE){
-                    boot_tree = new PhyloSuperTreePlen((SuperAlignment*) bootstrap_alignment, (PhyloSuperTree*) tree);
-                } else {
-                    boot_tree = new PhyloSuperTree((SuperAlignment*) bootstrap_alignment, (PhyloSuperTree*) tree);
-                }
-            } else {
-                // allocate heterotachy tree if neccessary
-                int pos = posRateHeterotachy(alignment->model_name);
-                
-                if (params.num_mixlen > 1) {
-                    boot_tree = new PhyloTreeMixlen(bootstrap_alignment, params.num_mixlen);
-                } else if (pos != string::npos) {
-                    boot_tree = new PhyloTreeMixlen(bootstrap_alignment, 0);
-                } else
-                    boot_tree = new IQTree(bootstrap_alignment);
-            }
+            
+            // allocate heterotachy tree if neccessary
+            int pos = posRateHeterotachy(alignment->model_name);
+            
+            if (params.num_mixlen > 1) {
+                boot_tree = new PhyloTreeMixlen(bootstrap_alignment, params.num_mixlen);
+            } else if (pos != string::npos) {
+                boot_tree = new PhyloTreeMixlen(bootstrap_alignment, 0);
+            } else
+                boot_tree = new IQTree(bootstrap_alignment);
 
             if (!tree->constraintTree.empty()) {
                 boot_tree->constraintTree.readConstraint(tree->constraintTree);
@@ -5007,13 +5001,19 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
 }
 
 void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) {
+    if (alignment->isSuperAlignment()){
+        outError("Little bootstrap fast not implemented for superalignments");
+    }
+
     ModelCheckpoint *model_info = new ModelCheckpoint;
     StrVector removed_seqs, twin_seqs;
     
     string treefile_name = params.out_prefix;
     treefile_name += ".treefile";
     string boottrees_name = params.out_prefix;
-    boottrees_name += ".ufboot";
+    boottrees_name += ".boottrees";
+    string ufboot_name = params.out_prefix;
+    ufboot_name += ".ufboot";
     string bootaln_name = params.out_prefix;
     bootaln_name += ".bootaln";
     string bootlh_name = params.out_prefix;
@@ -5052,12 +5052,14 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     // 2018-06-21: bug fix: alignment might be changed by -m ...MERGE
     alignment = tree->aln;
 
-    if (params.compute_ml_tree) {
+    if (!params.nbs_tree_file) {
         cout << endl << "===> START ANALYSIS ON THE ORIGINAL ALIGNMENT" << endl << endl;
         if (params.num_runs == 1)
             runTreeReconstruction(params, tree);
         else
             runMultipleTreeReconstruction(params, tree->aln, tree);
+    } else {
+        std::cout << "Using user-supplied tree file " << params.nbs_tree_file << " for little " << RESAMPLE_NAME << " support assignment." << std::endl;
     }
 
     // turn off all branch tests
@@ -5079,6 +5081,8 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     params.stop_condition = SC_BOOTSTRAP_CORRELATION;
     params.print_ufboot_trees = 2;
 
+    params.nbs_site = alignment->getNSite();
+
     MExtTree ext_tree;
     cout << "Reading tree " << treefile_name.c_str() << " (forced unrooted)..." << endl;
     bool is_rooted = false;
@@ -5097,24 +5101,28 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     do {
         cout << endl << "===> ITERATION: " << iteration + 1 << endl << endl;
 
+        IntVector candidate_sites;
+        // generate candidate sites for little bootstrap
+        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), params.nbs_prop);
+        std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
+                    << little_bs_size << " (" << (double)little_bs_size / alignment->getNSite() * 100 << "% of total "
+                    << alignment->getNSite() << " sites)..." << std::endl;
+        random_resampling(alignment->getNSite(), little_bs_size, candidate_sites, true, randstream);
+
+        Alignment* bootstrap_alignment = new Alignment;
+        bootstrap_alignment->extractSites(alignment, candidate_sites);
+
         IQTree *boot_tree;
-        if (alignment->isSuperAlignment()){
-            if(params.partition_type != BRLEN_OPTIMIZE){
-                boot_tree = new PhyloSuperTreePlen((SuperAlignment*) alignment, (PhyloSuperTree*) tree);
-            } else {
-                boot_tree = new PhyloSuperTree((SuperAlignment*) alignment, (PhyloSuperTree*) tree);
-            }
-        } else {
-            // allocate heterotachy tree if neccessary
-            int pos = posRateHeterotachy(alignment->model_name);
-            
-            if (params.num_mixlen > 1) {
-                boot_tree = new PhyloTreeMixlen(alignment, params.num_mixlen);
-            } else if (pos != string::npos) {
-                boot_tree = new PhyloTreeMixlen(alignment, 0);
-            } else
-                boot_tree = new IQTree(alignment);
-        }
+        
+        // allocate heterotachy tree if neccessary
+        int pos = posRateHeterotachy(bootstrap_alignment->model_name);
+        
+        if (params.num_mixlen > 1) {
+            boot_tree = new PhyloTreeMixlen(bootstrap_alignment, params.num_mixlen);
+        } else if (pos != string::npos) {
+            boot_tree = new PhyloTreeMixlen(bootstrap_alignment, 0);
+        } else
+            boot_tree = new IQTree(bootstrap_alignment);
 
         if (!tree->constraintTree.empty()) {
             boot_tree->constraintTree.readConstraint(tree->constraintTree);
@@ -5133,8 +5141,15 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
         try {
             ofstream tree_out;
             tree_out.exceptions(ios::failbit | ios::badbit);
-            tree_out.open(boottrees_name.c_str(), ios_base::out | ios_base::app);
-            tree_out << ss.str() << endl;
+            tree_out.open(boottrees_name.c_str(), ios::app);
+
+            ifstream ufboot_in(ufboot_name.c_str());
+            if (ufboot_in.good()) {
+                tree_out << ufboot_in.rdbuf();
+                tree_out << endl; 
+                ufboot_in.close();
+            }
+            
             tree_out.close();
         } catch (ios::failure) {
             outError(ERR_WRITE_OUTPUT, boottrees_name);
@@ -5158,17 +5173,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
             }
         } else cout << endl; 
 
-        if (last_weights_vec.empty()) {
-            rmsd = DBL_MAX;
-        } else {
-            assert(last_weights_vec.size() == weights_vec.size());
-            double sum_sq = 0.0;
-            for (size_t i = 0; i < weights_vec.size(); i++) {
-                double diff = (weights_vec[i] - last_weights_vec[i]) / 100;
-                sum_sq += diff * diff;
-            }
-            rmsd = sqrt(sum_sq / weights_vec.size());
-        }
+        double rmsd = (iteration > 0 ? calcRMSD(weights_vec, last_weights_vec, 100) : DBL_MAX);
         std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
         last_weights_vec = weights_vec;
         iteration++;
@@ -5176,6 +5181,8 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
         tree->getCheckpoint()->keepKeyPrefix("iqtree");
         tree->getCheckpoint()->putBool("finished", false);
         tree->getCheckpoint()->dump(true);
+
+        delete bootstrap_alignment;
     } while (rmsd > params.nbs_cutoff || iteration < params.nbs_min_iter);
         
     ext_tree.summarizeLittleBootstrapSupport();

@@ -7498,6 +7498,18 @@ size_t determineLittleBootstrapSubsampleSize(size_t nsites, double exp) {
     return (size_t) pow((double)nsites, exponent);
 }
 
+double calcRMSD(const vector<double> &a, const vector<double> &b, double scale) {
+    if (a.empty() || b.empty()) 
+        outError("Cannot calculate RMSD for empty vectors");
+    if (a.size() != b.size())
+        outError("Cannot calculate RMSD for vectors of different sizes");
+    double sum = 0.0;
+    for (size_t i = 0; i < a.size(); i++) {
+        double diff = (a[i] - b[i]) / scale;
+        sum += diff * diff;
+    }
+    return sqrt(sum / (double)a.size());
+}
 
 /* Following part is taken from ModelTest software */
 #define	BIGX            20.0                                 /* max value to represent exp (x) */
