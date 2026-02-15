@@ -3587,10 +3587,11 @@ void random_resampling(int n, int m, IntVector &sample, bool replacement = false
 /**
  * Determine the subsample size for little bootstrap
  * @param nsites total number of sites
+ * @param npatterns total number of patterns
  * @param exp exponent for subsample size calculation
  * @return subsample size
  */
-size_t determineLittleBootstrapSubsampleSize(size_t nsites, double exp);
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp);
 
 /**
  * calculate root mean square deviation between two vectors

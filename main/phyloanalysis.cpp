@@ -4874,7 +4874,7 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
 
         IntVector candidate_sites;
         // generate candidate sites for little bootstrap
-        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), params.nbs_prop);
+        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), alignment->getNPattern(), params.nbs_prop);
         std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
                     << little_bs_size << " (" << (double)little_bs_size / alignment->getNSite() * 100 << "% of total "
                     << alignment->getNSite() << " sites)..." << std::endl;
@@ -5084,9 +5084,10 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     params.nbs_site = alignment->getNSite();
 
     MExtTree ext_tree;
-    cout << "Reading tree " << treefile_name.c_str() << " (forced unrooted)..." << endl;
+    std::string input_treefile = params.nbs_tree_file ? params.nbs_tree_file : treefile_name;
+    cout << "Reading tree " << input_treefile << " (forced unrooted)..." << endl;
     bool is_rooted = false;
-    ext_tree.init(treefile_name.c_str(), is_rooted, true);
+    ext_tree.init(input_treefile.c_str(), is_rooted, true);
     
     if (ext_tree.rooted)
         cout << "rooted tree detected" << endl;
@@ -5103,7 +5104,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
 
         IntVector candidate_sites;
         // generate candidate sites for little bootstrap
-        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), params.nbs_prop);
+        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), alignment->getNPattern(), params.nbs_prop);
         std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
                     << little_bs_size << " (" << (double)little_bs_size / alignment->getNSite() * 100 << "% of total "
                     << alignment->getNSite() << " sites)..." << std::endl;

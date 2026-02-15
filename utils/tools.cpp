@@ -7483,12 +7483,12 @@ void random_resampling(int n, int m, IntVector &sample, bool replacement, int *r
     }
 }
 
-size_t determineLittleBootstrapSubsampleSize(size_t nsites, double exp) {
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp) {
     double exponent = exp;
     if (exp <= 0) {
-        if (nsites < 10000) {
+        if (npatterns < 10000) {
             exponent = 0.9;
-        } else if (nsites < 100000) {
+        } else if (npatterns < 100000) {
             exponent = 0.8;
         } else {
             exponent = 0.7;
