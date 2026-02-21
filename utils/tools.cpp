@@ -6127,7 +6127,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     
 	// Diep:
 	if(params.ufboot2corr == true){
-		if(params.gbo_replicates <= 0) params.ufboot2corr = false;
+		if(params.gbo_replicates <= 0 && !params.fnbs) params.ufboot2corr = false;
 		else params.stop_condition = SC_UNSUCCESS_ITERATION;
 
 		params.print_ufboot_trees = 2; // 2017-09-25: fix bug regarding the order of -bb 1000 -bnni -wbt
