@@ -589,6 +589,14 @@ enum SymTest {
     SYMTEST_NONE, SYMTEST_BINOM, SYMTEST_MAXDIV
 };
 
+enum NBSType {
+    NBS_MEAN, NBS_MEDIAN
+};
+
+enum NBSPrintType {
+    NBS_PRINT_SUPPORT, NBS_PRINT_ALL
+};
+
 const int BRLEN_OPTIMIZE = 0; // optimize branch lengths
 const int BRLEN_FIX      = 1; // fix branch lengths
 const int BRLEN_SCALE    = 2; // scale branch lengths
@@ -2500,6 +2508,8 @@ public:
     double nbs_min_iter; // number of initial subsamples used to compute initial RMSD, default 5
     char* nbs_tree_file; // user tree file for NBS, default NULL
     int nbs_site; // number of sites to upsample to
+    NBSType nbs_mode; // mode for NBS, either NBS_MEAN or NBS_MEDIAN
+    NBSPrintType nbs_print_mode; // whether to print NBS trees, and if so, in what format (NBS_PRINT_NONE, NBS_PRINT_ALL, NBS_PRINT_FINAL)
 
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
@@ -3601,6 +3611,20 @@ size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, do
  * @return RMSD value
  */
 double calcRMSD(const vector<double> &a, const vector<double> &b, double scale = 1.0);
+
+/**
+ * calculate mean of a vector
+ * @param v vector
+ * @return mean value
+ */
+double calcMean(const vector<double> &v);
+
+/**
+ * calculate median of a vector
+ * @param v vector
+ * @return median value
+ */
+double calcMedian(const vector<double> &v);
 
 #define RESAMPLE_NAME ((Params::getInstance().jackknife_prop == 0.0) ? "bootstrap" : "jackknife")
 #define RESAMPLE_NAME_I ((Params::getInstance().jackknife_prop == 0.0) ? "Bootstrap" : "Jackknife")

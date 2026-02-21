@@ -1400,6 +1400,8 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.nbs_prop = 0;
     params.nbs_min_iter = 5;
     params.nbs_tree_file = NULL;
+    params.nbs_mode = NBS_MEAN;
+    params.nbs_print_mode = NBS_PRINT_SUPPORT;
     params.min_correlation = 0.99;
     params.step_iterations = 100;
 //    params.store_candidate_trees = false;
@@ -4566,6 +4568,19 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.nbs_tree_file = argv[cnt];
                 continue;
             }
+            if (strcmp(argv[cnt], "--nbs-mode") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-mode <mode>";
+                if (strcmp(argv[cnt], "MEAN") != 0 && strcmp(argv[cnt], "MEDIAN") != 0)
+                    throw "Wrong value for --nbs-mode. Use 'MEAN' or 'MEDIAN'";
+                params.nbs_mode = (strcmp(argv[cnt], "MEAN") == 0) ? NBS_MEAN : NBS_MEDIAN;
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-print-all") == 0) {
+                params.nbs_print_mode = NBS_PRINT_ALL;
+                continue;
+            }
 
 			if (strcmp(argv[cnt], "-u2c_nni5") == 0) {
 				params.u2c_nni5 = true;
@@ -7511,6 +7526,28 @@ double calcRMSD(const vector<double> &a, const vector<double> &b, double scale) 
     return sqrt(sum / (double)a.size());
 }
 
+double calcMean(const vector<double> &v) {
+    if (v.empty())
+        outError("Cannot calculate mean for an empty vector");
+    double sum = 0.0;
+    for (size_t i = 0; i < v.size(); i++)
+        sum += v[i];
+    return sum / (double)v.size();
+}
+
+double calcMedian(const vector<double> &v) {
+    if (v.empty())
+        outError("Cannot calculate median for an empty vector");
+    vector<double> sorted_v = v;
+    sort(sorted_v.begin(), sorted_v.end());
+    size_t n = sorted_v.size();
+    if (n % 2 == 0) {
+        return (sorted_v[n / 2 - 1] + sorted_v[n / 2]) / 2.0;
+    } else {
+        return sorted_v[n / 2];
+    }
+}
+
 /* Following part is taken from ModelTest software */
 #define	BIGX            20.0                                 /* max value to represent exp (x) */
 #define	LOG_SQRT_PI     0.5723649429247000870717135          /* log (sqrt (pi)) */
@@ -8030,6 +8067,8 @@ void Params::setDefault() {
     nbs_prop = 0;
     nbs_min_iter = 5;
     nbs_tree_file = NULL;
+    nbs_mode = NBS_MEAN;
+    nbs_print_mode = NBS_PRINT_SUPPORT;
     u2c_nni5 = false;
     date_with_outgroup = true;
     date_debug = false;

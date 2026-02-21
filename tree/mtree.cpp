@@ -2826,9 +2826,12 @@ void MTree::createLittleBootstrapSupport(vector<string> &taxname, MTreeSet &tree
 				mysplit.invert();
 			Split *sp = hash_ss.findSplit(&mysplit);
             double weight = (sp != NULL) ? sp->getWeight() : 0.0;
-            std::cerr << (*it)->node->name << " old: " << (*it)->node->supportValue << " new: " << weight << std::endl;
-            (*it)->node->supportValue = weight;
-            weights.push_back(weight);
+            (*it)->node->supportValues.push_back(weight);
+
+            std::cerr << (*it)->node->name << " old: " << (*it)->node->supportValue;
+            (*it)->node->supportValue = (Params::getInstance().nbs_mode == NBS_MEAN) ? calcMean((*it)->node->supportValues) : calcMedian((*it)->node->supportValues);
+            std::cerr << " new: " << (*it)->node->supportValue << ", support value: " << weight << ", iteration: " << iteration << std::endl;
+            weights.push_back((*it)->node->supportValue);
 		}
 		createLittleBootstrapSupport(taxname, trees, hash_ss, tag, iteration, weights, (*it)->node, node);
 	}	
@@ -2841,13 +2844,18 @@ void MTree::summarizeLittleBootstrapSupport(Node *node, Node *dad) {
             double weight = (*it)->node->supportValue;
 
             stringstream tmp;
-            if ((*it)->node->name.empty())
-                tmp << weight;
-            else
-                tmp << "/" << weight;
-                
+            tmp << weight;
+            if (Params::getInstance().nbs_print_mode == NBS_PRINT_ALL) {
+                tmp << "[";
+                for (size_t i = 0; i < (*it)->node->supportValues.size(); i++) {
+                    tmp << (*it)->node->supportValues[i];
+                    if (i != (*it)->node->supportValues.size() - 1)
+                        tmp << "|";
+                }
+                tmp << "]";
+            }
             // assign tag          
-            (*it)->node->name.append(tmp.str());
+            (*it)->node->name = tmp.str();
 		}
 		summarizeLittleBootstrapSupport((*it)->node, node);
 	}	

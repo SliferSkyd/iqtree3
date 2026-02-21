@@ -4953,23 +4953,13 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
                 cout << endl << "===> ASSIGN " << RESAMPLE_NAME_UPPER
                     << " SUPPORTS TO THE TREE FROM ORIGINAL ALIGNMENT" << endl << endl;
 
-                assignLittleBootstrapSupport(boottrees_name.c_str(), 0, 1e6,
+                assignLittleBootstrapSupport(boottrees_name.c_str(), iteration * params.num_bootstrap_samples, params.num_bootstrap_samples,
                         treefile_name.c_str(), false, treefile_name.c_str(),
                         params.out_prefix, ext_tree, NULL, &params, iteration, weights_vec);   
             }
         } else cout << endl; 
 
-        if (last_weights_vec.empty()) {
-            rmsd = DBL_MAX;
-        } else {
-            assert(last_weights_vec.size() == weights_vec.size());
-            double sum_sq = 0.0;
-            for (size_t i = 0; i < weights_vec.size(); i++) {
-                double diff = (weights_vec[i] - last_weights_vec[i]) / 100;
-                sum_sq += diff * diff;
-            }
-            rmsd = sqrt(sum_sq / weights_vec.size());
-        }
+        double rmsd = (iteration > 0 ? calcRMSD(weights_vec, last_weights_vec, 100) : DBL_MAX);
         std::cout << "Iteration " << (iteration) << " completed. RMSD of weights: " << rmsd << std::endl;
         last_weights_vec = weights_vec;
         iteration++;
@@ -5147,7 +5137,6 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
             ifstream ufboot_in(ufboot_name.c_str());
             if (ufboot_in.good()) {
                 tree_out << ufboot_in.rdbuf();
-                tree_out << endl; 
                 ufboot_in.close();
             }
             
@@ -5168,7 +5157,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
                 cout << endl << "===> ASSIGN " << RESAMPLE_NAME_UPPER
                     << " SUPPORTS TO THE TREE FROM ORIGINAL ALIGNMENT" << endl << endl;
 
-                assignLittleBootstrapSupport(boottrees_name.c_str(), 0, 1e6,
+                assignLittleBootstrapSupport(boottrees_name.c_str(), iteration * params.num_bootstrap_samples, params.num_bootstrap_samples,
                         treefile_name.c_str(), false, treefile_name.c_str(),
                         params.out_prefix, ext_tree, NULL, &params, iteration, weights_vec);   
             }

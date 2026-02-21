@@ -301,6 +301,11 @@ public:
     double supportValue;
 
     /**
+     *  Support values of branches leading to this node for each subsample (use for little bootstrap)
+     */
+    vector<double> supportValues;
+
+    /**
         constructor
      */
     Node() {
