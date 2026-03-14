@@ -116,8 +116,9 @@ public:
             initialize the tree from a NEWICK tree file
             @param userTreeFile the name of the user tree
             @param is_rooted (IN/OUT) true if tree is rooted
+            @param force_unrooted if true, force the tree to be unrooted
      */
-    void init(const char *userTreeFile, bool &is_rooted);
+    void init(const char *userTreeFile, bool &is_rooted, bool force_unrooted = false);
 
     /**
             initialize tree, get from another tree
@@ -305,11 +306,19 @@ public:
     virtual void readTree(const char *infile, bool &is_rooted, int tree_line_index = 0);
 
     /**
+            read the tree from the input file in newick format (force unrooted)
+            @param infile the input file file.
+            @param is_rooted (IN/OUT) true if tree is rooted
+            @param tree_line_index the line_index to read the tree (in case with multiple trees *.parttrees)
+     */
+    virtual void readTreeUnrooted(const char *infile, bool &is_rooted, int tree_line_index = 0);
+
+    /**
             read the tree from the ifstream in newick format
             @param in the input stream.
             @param is_rooted (IN/OUT) true if tree is rooted
      */
-    virtual void readTree(istream &in, bool &is_rooted);
+    virtual void readTree(istream &in, bool &is_rooted, bool force_unrooted = false);
 
     /**
             read the tree from a newick string
@@ -933,6 +942,12 @@ public:
 	*/
 	void createBootstrapSupport(vector<string> &taxname, MTreeSet &trees, SplitIntMap &hash_ss, char *tag,
 		Node *node = NULL, Node *dad = NULL);
+
+        void createLittleBootstrapSupport(vector<string> &taxname, MTreeSet &trees, SplitIntMap &hash_ss, char *tag,
+                int iteration, std::vector<double>& weights_vec, Node *node = NULL, Node *dad = NULL);
+        
+        void summarizeLittleBootstrapSupport(Node *node = NULL, Node *dad = NULL);
+
 
 	void reportDisagreedTrees(vector<string> &taxname, MTreeSet &trees, Split &mysplit);
 

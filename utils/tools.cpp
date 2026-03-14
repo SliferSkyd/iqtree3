@@ -1396,6 +1396,13 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.max_candidate_trees = 0;
     params.distinct_trees = false;
     params.online_bootstrap = true;
+    params.nbs_cutoff = 0.05;
+    params.nbs_prop = 0;
+    params.nbs_min_iter = 5;
+    params.nbs_tree_file = NULL;
+    params.nbs_mode = NBS_MEAN;
+    params.nbs_print_mode = NBS_PRINT_SUPPORT;
+    params.nbs_subsample_size = 0;
     params.min_correlation = 0.99;
     params.step_iterations = 100;
 //    params.store_candidate_trees = false;
@@ -4520,6 +4527,71 @@ void parseArg(int argc, char *argv[], Params &params) {
 //				params.print_ufboot_trees = 2; // Diep: relocate to be below this for loop
 				continue;
 			}
+            if (strcmp(argv[cnt], "--nbs") == 0 || strcmp(argv[cnt], "-nbs") == 0) {
+				params.nbs = true;
+				continue;
+			}
+            if (strcmp(argv[cnt], "--fnbs") == 0 || strcmp(argv[cnt], "-fnbs") == 0) {
+				params.fnbs = true;
+				continue;
+			}
+            if (strcmp(argv[cnt], "--nbs-prop") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-prop <proportion>";
+                params.nbs_prop = convert_double(argv[cnt]);
+                if (params.nbs_prop <= 0.0 || params.nbs_prop > 1.0)
+                    throw "Little bootstrap proportion must be between 0.0 and 1.0";
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-cutoff") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-cutoff <threshold>";
+                params.nbs_cutoff = convert_double(argv[cnt]);
+                if (params.nbs_cutoff <= 0.0 || params.nbs_cutoff >= 1.0)
+                    throw "Little bootstrap cutoff must be between 0.0 and 1.0";
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-min-iter") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-min-iter <min_iterations>";
+                params.nbs_min_iter = convert_double(argv[cnt]);
+                if (params.nbs_min_iter < 0)
+                    throw "Number of little bootstrap iterations must be non-negative";
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-tree-file") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-tree-file <tree_file>";
+                params.nbs_tree_file = argv[cnt];
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-mode") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-mode <mode>";
+                if (strcmp(argv[cnt], "MEAN") != 0 && strcmp(argv[cnt], "MEDIAN") != 0)
+                    throw "Wrong value for --nbs-mode. Use 'MEAN' or 'MEDIAN'";
+                params.nbs_mode = (strcmp(argv[cnt], "MEAN") == 0) ? NBS_MEAN : NBS_MEDIAN;
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-print-all") == 0) {
+                params.nbs_print_mode = NBS_PRINT_ALL;
+                continue;
+            }
+            if (strcmp(argv[cnt], "--nbs-subsample-size") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-subsample-size <size>";
+                params.nbs_subsample_size = convert_int(argv[cnt]);
+                if (params.nbs_subsample_size < 1)
+                    throw "Subsample size for little bootstrap must be positive";
+                continue;
+            }
+
 			if (strcmp(argv[cnt], "-u2c_nni5") == 0) {
 				params.u2c_nni5 = true;
 				continue;
@@ -6065,7 +6137,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     
 	// Diep:
 	if(params.ufboot2corr == true){
-		if(params.gbo_replicates <= 0) params.ufboot2corr = false;
+		if(params.gbo_replicates <= 0 && !params.fnbs) params.ufboot2corr = false;
 		else params.stop_condition = SC_UNSUCCESS_ITERATION;
 
 		params.print_ufboot_trees = 2; // 2017-09-25: fix bug regarding the order of -bb 1000 -bnni -wbt
@@ -6362,6 +6434,16 @@ void usage_iqtree(char* argv[], bool full_command) {
     << "  --jack-prop NUM      Subsampling proportion for jackknife (default: 0.5)" << endl
     << "  --bcon NUM           Replicates for bootstrap + consensus tree" << endl
     << "  --bonly NUM          Replicates for bootstrap only" << endl
+
+    << endl << "LITTLE BOOTSTRAP:" << endl
+    << "  -b, --boot NUM            Replicates for bootstrap + ML tree" << endl
+    << "  --nbs                     Use little bootstrap" << endl 
+    << "  --fnbs                    Use fast little bootstrap" << endl
+    << "  --nbs-prop NUM            Subsampling proportion for little bootstrap (default: 0.05)" << endl
+    << "  --nbs-cutoff NUM          RMSD threshold for convergence (default: 0.05)" << endl
+    << "  --nbs-min-iter NUM        Minimum number of iterations (default: 5)" << endl
+    << "  --nbs-tree-file STRING    User-defined tree file path" << endl
+
 #ifdef USE_BOOSTER
     << "  --tbe                Transfer bootstrap expectation" << endl
 #endif
@@ -7407,6 +7489,78 @@ void random_resampling(int n, IntVector &sample, int *rstream) {
     }
 }
 
+void random_resampling(int n, int m, IntVector &sample, bool replacement, int *rstream) {
+    // little bootstrap resampling
+    sample.resize(m, 0);
+    if (!replacement) {
+        for (int i = 0; i < n; i++) {
+            int j = random_int(m, rstream);
+            sample[j]++;            
+        }
+    } else {
+        IntVector indices(n);
+        for (int i = 0; i < n; i++)
+            indices[i] = i;
+        my_random_shuffle(indices.begin(), indices.end());
+        for (int i = 0; i < m; i++) {
+            sample[i] = indices[i];
+        }
+    }
+}
+
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp, size_t fixed_subsample_size) {
+    if (fixed_subsample_size > 0) {
+        std::cout << "INFO: Little bootstrap subsample size set to fixed value of " << fixed_subsample_size << " sites." << std::endl;
+        return fixed_subsample_size;
+    }
+    double exponent = exp;
+    if (exp <= 0) {
+        if (npatterns < 10000) {
+            exponent = 0.9;
+        } else if (npatterns < 100000) {
+            exponent = 0.8;
+        } else {
+            exponent = 0.7;
+        }
+    }
+    std::cout << "INFO: Little bootstrap subsample size set to nsites^" << convertDoubleToString(exponent) << " = " << convertDoubleToString(pow((double)nsites, exponent)) << " sites." << std::endl;
+    return (size_t) pow((double)nsites, exponent);
+}
+
+double calcRMSD(const vector<double> &a, const vector<double> &b, double scale) {
+    if (a.empty() || b.empty()) 
+        outError("Cannot calculate RMSD for empty vectors");
+    if (a.size() != b.size())
+        outError("Cannot calculate RMSD for vectors of different sizes");
+    double sum = 0.0;
+    for (size_t i = 0; i < a.size(); i++) {
+        double diff = (a[i] - b[i]) / scale;
+        sum += diff * diff;
+    }
+    return sqrt(sum / (double)a.size());
+}
+
+double calcMean(const vector<double> &v) {
+    if (v.empty())
+        outError("Cannot calculate mean for an empty vector");
+    double sum = 0.0;
+    for (size_t i = 0; i < v.size(); i++)
+        sum += v[i];
+    return sum / (double)v.size();
+}
+
+double calcMedian(const vector<double> &v) {
+    if (v.empty())
+        outError("Cannot calculate median for an empty vector");
+    vector<double> sorted_v = v;
+    sort(sorted_v.begin(), sorted_v.end());
+    size_t n = sorted_v.size();
+    if (n % 2 == 0) {
+        return (sorted_v[n / 2 - 1] + sorted_v[n / 2]) / 2.0;
+    } else {
+        return sorted_v[n / 2];
+    }
+}
 
 /* Following part is taken from ModelTest software */
 #define	BIGX            20.0                                 /* max value to represent exp (x) */
@@ -7921,6 +8075,15 @@ void Params::setDefault() {
     print_all_checkpoints = false;
     suppress_output_flags = 0;
     ufboot2corr = false;
+    nbs = false;
+    fnbs = false;
+    nbs_cutoff = 0.05;
+    nbs_prop = 0;
+    nbs_min_iter = 5;
+    nbs_tree_file = NULL;
+    nbs_mode = NBS_MEAN;
+    nbs_subsample_size = 0;
+    nbs_print_mode = NBS_PRINT_SUPPORT;
     u2c_nni5 = false;
     date_with_outgroup = true;
     date_debug = false;

@@ -451,8 +451,10 @@ void MTreeSet::convertSplits(vector<string> &taxname, SplitGraph &sg, SplitIntMa
 		if (tree_weights[tree_id] == 0) continue;
 		MTree *tree = *it;
 
-		if (tree->leafNum != taxname.size())
+		if (tree->leafNum != taxname.size()) {
+			std::cerr << "Tree " << tree_id+1 << " has " << tree->leafNum << " taxa while expected " << taxname.size() << endl;
 			outError("Tree has different number of taxa!");
+		}
 		if (sort_taxa) {
 			NodeVector taxa;
 			tree->getTaxa(taxa);

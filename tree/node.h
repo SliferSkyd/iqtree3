@@ -295,6 +295,16 @@ public:
      */
     NodeVector closestLeaves;
 
+    /** 
+     *  Support value of branches leading to this node (use for little bootstrap)
+     */
+    double supportValue;
+
+    /**
+     *  Support values of branches leading to this node for each subsample (use for little bootstrap)
+     */
+    vector<double> supportValues;
+
     /**
         constructor
      */

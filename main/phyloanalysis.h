@@ -79,6 +79,10 @@ void assignBootstrapSupport(const char *input_trees, int burnin, int max_count, 
 	bool rooted, const char *output_tree, const char *out_prefix, MExtTree &mytree, 
 	const char* tree_weight_file, Params *params);
 
+void assignLittleBootstrapSupport(const char *input_trees, int burnin, int max_count, const char *target_tree, 
+	bool rooted, const char *output_tree, const char *out_prefix, MExtTree &mytree, 
+	const char* tree_weight_file, Params *params, int iteration, std::vector<double>& weights_vec);
+
 /**
  * assign branch supports from params.user_tree trees file to params.second_tree
  * @param params program parameters

@@ -52,13 +52,16 @@ MTree::MTree(const char *userTreeFile, bool &is_rooted)
     init(userTreeFile, is_rooted);
 }
 
-void MTree::init(const char *userTreeFile, bool &is_rooted) {
+void MTree::init(const char *userTreeFile, bool &is_rooted, bool force_unrooted) {
     if (Params::getInstance().min_branch_length <= 0)
         num_precision = 6;
     else
         num_precision = max((int)ceil(-log10(Params::getInstance().min_branch_length))+1, 6);
     len_scale = 1.0;
-    readTree(userTreeFile, is_rooted);
+    if (force_unrooted)
+        readTreeUnrooted(userTreeFile, is_rooted);
+    else 
+        readTree(userTreeFile, is_rooted);
     //printInfo();
 	fig_char = "|-+++";
 }
@@ -711,6 +714,36 @@ void MTree::readTree(const char *infile, bool &is_rooted, int tree_line_index) {
              " taxa and " << nodeNum-1-is_rooted << " branches" << (is_rooted ? " (rooted)" : "") << endl;
 }
 
+void MTree::readTreeUnrooted(const char *infile, bool &is_rooted, int tree_line_index) {
+    ifstream in;
+    try {
+        in.exceptions(ios::failbit | ios::badbit);
+        in.open(infile);
+        // move to the correct line to read the tree (in case with multiple trees *.parttrees)
+        for (int i = 0; i < tree_line_index; i++)
+        {
+            in.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            
+            // make sure the current line is not empty
+            if (in.peek() == EOF )
+                outError("Could not found a tree for the partition " + convertIntToString(tree_line_index + 1) + " at line " + convertIntToString(tree_line_index + 1) + " in the input tree file. To use Edge-unlinked partition model, each tree for each partition should be specified in a single line one by one in the input (multiple)-tree file.");
+        }
+        readTree(in, is_rooted, true);
+        in.close();
+    } catch (ios::failure) {
+        outError(ERR_READ_INPUT, infile);
+    }
+
+    rooted = is_rooted;
+
+    if (is_rooted)
+        outError("An unrooted tree is expected, but a rooted tree was found in the input tree file.");
+
+    if (verbose_mode >= VB_MED)
+        cout << "Tree contains " << leafNum - is_rooted <<
+             " taxa and " << nodeNum-1-is_rooted << " branches" << (is_rooted ? " (rooted)" : "") << endl;
+}
+
 void MTree::read_TreeString(string tree_string, bool is_rooted) {
 	stringstream str;
 	str << tree_string;
@@ -720,7 +753,7 @@ void MTree::read_TreeString(string tree_string, bool is_rooted) {
 }
 
 
-void MTree::readTree(istream &in, bool &is_rooted)
+void MTree::readTree(istream &in, bool &is_rooted, bool force_unrooted)
 {
     in_line = 1;
     in_column = 1;
@@ -739,7 +772,7 @@ void MTree::readTree(istream &in, bool &is_rooted)
         Node *node;
         parseFile(in, ch, node, branch_len);
         // 2018-01-05: assuming rooted tree if root node has two children
-        if (is_rooted || (!branch_len.empty() && branch_len[0] != 0.0) || node->degree() == 2) {
+        if (!force_unrooted && (is_rooted || (!branch_len.empty() && branch_len[0] != 0.0) || node->degree() == 2)) {
             if (branch_len.empty())
                 branch_len.push_back(-1.0);
             if (branch_len[0] == -1.0) branch_len[0] = 0.0;
@@ -2778,6 +2811,53 @@ void MTree::createBootstrapSupport(vector<string> &taxname, MTreeSet &trees, Spl
 			}
 		}
 		createBootstrapSupport(taxname, trees, hash_ss, tag, (*it)->node, node);
+	}	
+}
+
+void MTree::createLittleBootstrapSupport(vector<string> &taxname, MTreeSet &trees, SplitIntMap &hash_ss,
+    char *tag, int iteration, std::vector<double>& weights, Node *node, Node *dad) {
+	if (!node) node = root;	
+	FOR_NEIGHBOR_IT(node, dad, it) {
+		if (!node->isLeaf() && !(*it)->node->isLeaf()) {
+			vector<int> taxa;
+			getTaxaID(taxa, (*it)->node, node);
+			Split mysplit(leafNum, 0.0, taxa);
+			if (mysplit.shouldInvert())
+				mysplit.invert();
+			Split *sp = hash_ss.findSplit(&mysplit);
+            double weight = (sp != NULL) ? sp->getWeight() : 0.0;
+            (*it)->node->supportValues.push_back(weight);
+
+            std::cerr << (*it)->node->name << " old: " << (*it)->node->supportValue;
+            (*it)->node->supportValue = (Params::getInstance().nbs_mode == NBS_MEAN) ? calcMean((*it)->node->supportValues) : calcMedian((*it)->node->supportValues);
+            std::cerr << " new: " << (*it)->node->supportValue << ", support value: " << weight << ", iteration: " << iteration << std::endl;
+            weights.push_back((*it)->node->supportValue);
+		}
+		createLittleBootstrapSupport(taxname, trees, hash_ss, tag, iteration, weights, (*it)->node, node);
+	}	
+}
+
+void MTree::summarizeLittleBootstrapSupport(Node *node, Node *dad) {
+	if (!node) node = root;	
+	FOR_NEIGHBOR_IT(node, dad, it) {
+		if (!node->isLeaf() && !(*it)->node->isLeaf()) {
+            double weight = (*it)->node->supportValue;
+
+            stringstream tmp;
+            tmp << weight;
+            if (Params::getInstance().nbs_print_mode == NBS_PRINT_ALL) {
+                tmp << "[";
+                for (size_t i = 0; i < (*it)->node->supportValues.size(); i++) {
+                    tmp << (*it)->node->supportValues[i];
+                    if (i != (*it)->node->supportValues.size() - 1)
+                        tmp << "|";
+                }
+                tmp << "]";
+            }
+            // assign tag          
+            (*it)->node->name = tmp.str();
+		}
+		summarizeLittleBootstrapSupport((*it)->node, node);
 	}	
 }
 

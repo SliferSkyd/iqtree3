@@ -368,6 +368,7 @@ void IQTree::initSettings(Params &params) {
 #endif
         BootValType *mem = aligned_alloc<BootValType>(nptn * (size_t)(params.gbo_replicates));
         memset(mem, 0, nptn * (size_t)(params.gbo_replicates) * sizeof(BootValType));
+
         for (i = 0; i < params.gbo_replicates; i++)
             boot_samples[i] = mem + i*nptn;
 
@@ -389,14 +390,22 @@ void IQTree::initSettings(Params &params) {
                 else
                     bootstrap_alignment = new Alignment;
                 IntVector this_sample;
-                bootstrap_alignment->createBootstrapAlignment(aln, &this_sample, params.bootstrap_spec);
+                if (params.fnbs) {
+                    aln->createLittleBootstrapFastAlignment(bootstrap_alignment, params.nbs_site, &this_sample);
+                } else {
+                    aln->createBootstrapAlignment(bootstrap_alignment, &this_sample, params.bootstrap_spec);
+                }
                 for (size_t j = 0; j < orig_nptn; j++)
                     boot_samples[i][j] = this_sample[j];
                 bootstrap_alignment->printAlignment(params.aln_output_format, bootaln_name.c_str(), true);
                 delete bootstrap_alignment;
             } else {
                 IntVector this_sample;
-                aln->createBootstrapAlignment(this_sample, params.bootstrap_spec);
+                if (params.fnbs) {
+                    aln->createLittleBootstrapFastAlignment(params.nbs_site, this_sample);
+                } else {
+                    aln->createBootstrapAlignment(this_sample, params.bootstrap_spec);
+                }
                 for (size_t j = 0; j < orig_nptn; j++)
                     boot_samples[i][j] = this_sample[j];
             }
@@ -2853,7 +2862,11 @@ void IQTree::refineBootTrees() {
     ModelsBlock *models_block = readModelsDefinition(*params);
     
 	// do bootstrap analysis
-	for (int sample = refined_samples; sample < boot_trees.size(); sample++) {
+#ifdef _IQTREE_MPI
+	for (int sample = sample_start; sample < sample_end; sample++) {
+#else
+    for (int sample = refined_samples; sample < boot_trees.size(); sample++) {
+#endif
         // create bootstrap alignment
         Alignment* bootstrap_alignment;
         if (aln->isSuperAlignment())
@@ -2977,7 +2990,33 @@ void IQTree::refineBootTrees() {
     
     delete models_block;
 
+#ifdef _IQTREE_MPI
+    // Sum up the number of refined trees
+    MPIHelper::getInstance().barrier();
+
+    int total_refined_trees = 0;
+    MPI_Reduce(&refined_trees, &total_refined_trees, 1, MPI_INT, MPI_SUM, PROC_MASTER, MPI_COMM_WORLD);
+
+    if (MPIHelper::getInstance().isMaster()) {
+        cout << "Total " << total_refined_trees << " ufboot trees refined" << endl;
+    }
+
+    // Sync boot trees
+    MPIHelper::getInstance().barrier();
+    Checkpoint *new_checkpoint = new Checkpoint;
+    if (MPIHelper::getInstance().isWorker()) {
+        saveUFBoot(new_checkpoint);
+        MPIHelper::getInstance().sendCheckpoint(new_checkpoint, PROC_MASTER);
+    } else {
+        for (int i = 1; i < MPIHelper::getInstance().getNumProcesses(); i++) {
+            int worker = MPIHelper::getInstance().recvCheckpoint(new_checkpoint);
+            restoreUFBoot(new_checkpoint);
+        }
+    }
+    delete new_checkpoint;
+#else
     cout << "Total " << refined_trees << " ufboot trees refined" << endl;
+#endif
 
     // restore randstream
     finish_random();

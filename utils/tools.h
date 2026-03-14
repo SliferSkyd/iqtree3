@@ -589,6 +589,14 @@ enum SymTest {
     SYMTEST_NONE, SYMTEST_BINOM, SYMTEST_MAXDIV
 };
 
+enum NBSType {
+    NBS_MEAN, NBS_MEDIAN
+};
+
+enum NBSPrintType {
+    NBS_PRINT_SUPPORT, NBS_PRINT_ALL
+};
+
 const int BRLEN_OPTIMIZE = 0; // optimize branch lengths
 const int BRLEN_FIX      = 1; // fix branch lengths
 const int BRLEN_SCALE    = 2; // scale branch lengths
@@ -2493,6 +2501,17 @@ public:
 	bool ufboot2corr; // to turn on the correction mode for UFBoot under model violations, enable by "-bb <nrep> -correct
 	bool u2c_nni5; // to use NNI5 during Refinement Step of UFBoot2-Corr
 
+    bool nbs; // to turn on NBS, enabled by "-nbs"
+    bool fnbs; // to turn on fast NBS, enabled by "-fnbs"
+    double nbs_prop; // proportion of sites to sample in each replicate, default 0
+    double nbs_cutoff; // threshold for RMSD to stop NBS iterations, default 0.05
+    double nbs_min_iter; // number of initial subsamples used to compute initial RMSD, default 5
+    char* nbs_tree_file; // user tree file for NBS, default NULL
+    int nbs_site; // number of sites to upsample to
+    NBSType nbs_mode; // mode for NBS, either NBS_MEAN or NBS_MEDIAN
+    NBSPrintType nbs_print_mode; // whether to print NBS trees, and if so, in what format (NBS_PRINT_NONE, NBS_PRINT_ALL, NBS_PRINT_FINAL)
+    int nbs_subsample_size; // number of sites to subsample in each NBS iteration, if not specified, will be determined autoamtically based on nbs_prop and the total number of sites
+
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
 
@@ -3565,6 +3584,49 @@ void my_random_shuffle (T first, T last, int *rstream = NULL)
  @param rstream random number generator stream
 */
 void random_resampling(int n, IntVector &sample, int *rstream = NULL);
+
+/**
+ random resampling for little bootstrap
+ @param n sample size
+ @param m size of each resample
+ @param[in/out] sample array of size n with frequency of resampling
+ @param replacement TRUE if sampling with replacement, FALSE otherwise
+ @param rstream random number generator stream
+*/
+void random_resampling(int n, int m, IntVector &sample, bool replacement = false, int *rstream = NULL);
+
+/**
+ * Determine the subsample size for little bootstrap
+ * @param nsites total number of sites
+ * @param npatterns total number of patterns
+ * @param exp exponent for subsample size calculation
+ * @param fixed_subsample_size fixed subsample size (default 0, meaning automatic determination)
+ * @return subsample size
+ */
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp, size_t fixed_subsample_size = 0);
+
+/**
+ * calculate root mean square deviation between two vectors
+ * @param a first vector
+ * @param b second vector
+ * @param scale scaling factor (default 1.0)
+ * @return RMSD value
+ */
+double calcRMSD(const vector<double> &a, const vector<double> &b, double scale = 1.0);
+
+/**
+ * calculate mean of a vector
+ * @param v vector
+ * @return mean value
+ */
+double calcMean(const vector<double> &v);
+
+/**
+ * calculate median of a vector
+ * @param v vector
+ * @return median value
+ */
+double calcMedian(const vector<double> &v);
 
 #define RESAMPLE_NAME ((Params::getInstance().jackknife_prop == 0.0) ? "bootstrap" : "jackknife")
 #define RESAMPLE_NAME_I ((Params::getInstance().jackknife_prop == 0.0) ? "Bootstrap" : "Jackknife")

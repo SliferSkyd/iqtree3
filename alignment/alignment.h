@@ -595,6 +595,42 @@ public:
     virtual void createBootstrapAlignment(Alignment *aln, IntVector* pattern_freq = NULL, const char *spec = NULL);
 
     /**
+            This is for LITTLE BOOTSTRAP
+            create a non-parametric bootstrap alignment from an input alignment and a set of candidate sites
+            @param aln input alignment
+            @param candidate_sites (IN) candidate sites to draw from
+            @param pattern_freq (OUT) resampled pattern frequencies if not NULL
+     */
+    virtual void createLittleBootstrapAlignment(Alignment *aln, const IntVector& candidate_sites, IntVector* pattern_freq = NULL);
+
+    /**
+            This is for LITTLE BOOTSTRAP
+            create a non-parametric bootstrap alignment from an input alignment and a set of candidate sites
+            @param candidate_sites (IN) candidate sites to draw from
+            @param pattern_freq (OUT) resampled pattern frequencies if not NULL
+            @param rstream random generator stream, NULL to use the global randstream
+     */
+    virtual void createLittleBootstrapAlignment(const IntVector& candidate_sites, IntVector &pattern_freq, int *rstream = NULL);
+
+    /**
+            This is for LITTLE BOOTSTRAP FAST
+            create a non-parametric bootstrap alignment from a subsample alignment
+            @param nsite number of sites to draw
+            @param pattern_freq (OUT) resampled pattern frequencies
+            @param rstream random generator stream, NULL to use the global randstream
+    */
+    virtual void createLittleBootstrapFastAlignment(int nsite, IntVector& pattern_freq, int *rstream = NULL);
+
+    /**
+            This is for LITTLE BOOTSTRAP FAST
+            create a non-parametric bootstrap alignment from a subsample alignment
+            @param aln input alignment
+            @param nsite number of sites to draw
+            @param pattern_freq (OUT) resampled pattern frequencies
+    */
+    virtual void createLittleBootstrapFastAlignment(Alignment *aln, int nsite, IntVector* pattern_freq);
+
+    /**
             resampling pattern frequency by a non-parametric bootstrap 
             @param pattern_freq (OUT) resampled pattern frequencies
             @param spec bootstrap specification, see above
