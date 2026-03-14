@@ -2510,6 +2510,7 @@ public:
     int nbs_site; // number of sites to upsample to
     NBSType nbs_mode; // mode for NBS, either NBS_MEAN or NBS_MEDIAN
     NBSPrintType nbs_print_mode; // whether to print NBS trees, and if so, in what format (NBS_PRINT_NONE, NBS_PRINT_ALL, NBS_PRINT_FINAL)
+    int nbs_subsample_size; // number of sites to subsample in each NBS iteration, if not specified, will be determined autoamtically based on nbs_prop and the total number of sites
 
     /** method for phylogenetic dating, currently LSD and MCMCTree approximate likelihood method are supported */
     string dating_method;
@@ -3599,9 +3600,10 @@ void random_resampling(int n, int m, IntVector &sample, bool replacement = false
  * @param nsites total number of sites
  * @param npatterns total number of patterns
  * @param exp exponent for subsample size calculation
+ * @param fixed_subsample_size fixed subsample size (default 0, meaning automatic determination)
  * @return subsample size
  */
-size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp);
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp, size_t fixed_subsample_size = 0);
 
 /**
  * calculate root mean square deviation between two vectors

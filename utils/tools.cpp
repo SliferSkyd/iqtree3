@@ -1402,6 +1402,7 @@ void parseArg(int argc, char *argv[], Params &params) {
     params.nbs_tree_file = NULL;
     params.nbs_mode = NBS_MEAN;
     params.nbs_print_mode = NBS_PRINT_SUPPORT;
+    params.nbs_subsample_size = 0;
     params.min_correlation = 0.99;
     params.step_iterations = 100;
 //    params.store_candidate_trees = false;
@@ -4581,6 +4582,15 @@ void parseArg(int argc, char *argv[], Params &params) {
                 params.nbs_print_mode = NBS_PRINT_ALL;
                 continue;
             }
+            if (strcmp(argv[cnt], "--nbs-subsample-size") == 0) {
+                cnt++;
+                if (cnt >= argc)
+                    throw "Use --nbs-subsample-size <size>";
+                params.nbs_subsample_size = convert_int(argv[cnt]);
+                if (params.nbs_subsample_size < 1)
+                    throw "Subsample size for little bootstrap must be positive";
+                continue;
+            }
 
 			if (strcmp(argv[cnt], "-u2c_nni5") == 0) {
 				params.u2c_nni5 = true;
@@ -7498,7 +7508,11 @@ void random_resampling(int n, int m, IntVector &sample, bool replacement, int *r
     }
 }
 
-size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp) {
+size_t determineLittleBootstrapSubsampleSize(size_t nsites, size_t npatterns, double exp, size_t fixed_subsample_size) {
+    if (fixed_subsample_size > 0) {
+        std::cout << "INFO: Little bootstrap subsample size set to fixed value of " << fixed_subsample_size << " sites." << std::endl;
+        return fixed_subsample_size;
+    }
     double exponent = exp;
     if (exp <= 0) {
         if (npatterns < 10000) {
@@ -8068,6 +8082,7 @@ void Params::setDefault() {
     nbs_min_iter = 5;
     nbs_tree_file = NULL;
     nbs_mode = NBS_MEAN;
+    nbs_subsample_size = 0;
     nbs_print_mode = NBS_PRINT_SUPPORT;
     u2c_nni5 = false;
     date_with_outgroup = true;

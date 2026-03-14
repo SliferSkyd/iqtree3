@@ -4874,7 +4874,7 @@ void runLittleBootstrap(Params &params, Alignment *alignment, IQTree *tree) {
 
         IntVector candidate_sites;
         // generate candidate sites for little bootstrap
-        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), alignment->getNPattern(), params.nbs_prop);
+        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), alignment->getNPattern(), params.nbs_prop, params.nbs_subsample_size);
         std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
                     << little_bs_size << " (" << (double)little_bs_size / alignment->getNSite() * 100 << "% of total "
                     << alignment->getNSite() << " sites)..." << std::endl;
@@ -5094,7 +5094,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
 
         IntVector candidate_sites;
         // generate candidate sites for little bootstrap
-        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), alignment->getNPattern(), params.nbs_prop);
+        int little_bs_size = determineLittleBootstrapSubsampleSize(alignment->getNSite(), alignment->getNPattern(), params.nbs_prop, params.nbs_subsample_size);
         std::cout << "Generating candidate sites for little " << RESAMPLE_NAME << " with size "
                     << little_bs_size << " (" << (double)little_bs_size / alignment->getNSite() * 100 << "% of total "
                     << alignment->getNSite() << " sites)..." << std::endl;
