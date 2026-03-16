@@ -5071,8 +5071,6 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
     params.stop_condition = SC_BOOTSTRAP_CORRELATION;
     params.print_ufboot_trees = 2;
 
-    params.nbs_site = alignment->getNSite();
-
     MExtTree ext_tree;
     std::string input_treefile = params.nbs_tree_file ? params.nbs_tree_file : treefile_name;
     cout << "Reading tree " << input_treefile << " (forced unrooted)..." << endl;
@@ -5100,8 +5098,9 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
                     << alignment->getNSite() << " sites)..." << std::endl;
         random_resampling(alignment->getNSite(), little_bs_size, candidate_sites, true, randstream);
 
+        IntVector candidate_sites_in_bootstrap_alignment;
         Alignment* bootstrap_alignment = new Alignment;
-        bootstrap_alignment->extractSites(alignment, candidate_sites);
+        bootstrap_alignment->createLittleBootstrapAlignment(alignment, candidate_sites, NULL, candidate_sites_in_bootstrap_alignment);
 
         IQTree *boot_tree;
         
@@ -5122,6 +5121,7 @@ void runLittleBootstrapFast(Params &params, Alignment *alignment, IQTree *tree) 
         // set checkpoint
         boot_tree->setCheckpoint(tree->getCheckpoint());
         boot_tree->num_precision = tree->num_precision;
+        boot_tree->candidate_sites = &candidate_sites_in_bootstrap_alignment;
 
         runTreeReconstruction(params, boot_tree);
         // read in the output tree file

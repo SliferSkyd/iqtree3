@@ -613,6 +613,28 @@ public:
     virtual void createLittleBootstrapAlignment(const IntVector& candidate_sites, IntVector &pattern_freq, int *rstream = NULL);
 
     /**
+            This is for LITTLE BOOTSTRAP
+            create a non-parametric bootstrap alignment from an input alignment and a set of candidate sites, ensuring that all candidate sites are included in the bootstrap alignment
+            @param aln input alignment
+            @param candidate_sites (IN) candidate sites to draw from
+            @param pattern_freq (OUT) resampled pattern frequencies if not NULL
+            @param candidate_sites_in_bootstrap_alignment (OUT) the corresponding candidate sites in the bootstrap alignment, having equal size to candidate_sites. 
+                This is used for UFBoot2-Corr to ensure that all candidate sites are included in the bootstrap alignment and to track the corresponding candidate sites in the bootstrap alignment.
+     */
+    virtual void createLittleBootstrapAlignment(Alignment *aln, const IntVector& candidate_sites, IntVector *pattern_freq, IntVector &candidate_sites_in_bootstrap_alignment);
+
+    /**
+            This is for LITTLE BOOTSTRAP
+            create a non-parametric bootstrap alignment from an input alignment and a set of candidate sites, ensuring that all candidate sites are included in the bootstrap alignment
+            @param candidate_sites (IN) candidate sites to draw from
+            @param pattern_freq (OUT) resampled pattern frequencies if not NULL
+            @param candidate_sites_in_bootstrap_alignment (OUT) the corresponding candidate sites in the bootstrap alignment, having equal size to candidate_sites. 
+                This is used for UFBoot2-Corr to ensure that all candidate sites are included in the bootstrap alignment and to track the corresponding candidate sites in the bootstrap alignment.
+            @param rstream random generator stream, NULL to use the global randstream
+     */
+    virtual void createLittleBootstrapAlignment(const IntVector& candidate_sites, IntVector &pattern_freq, IntVector &candidate_sites_in_bootstrap_alignment, int *rstream = NULL);
+
+    /**
             This is for LITTLE BOOTSTRAP FAST
             create a non-parametric bootstrap alignment from a subsample alignment
             @param nsite number of sites to draw

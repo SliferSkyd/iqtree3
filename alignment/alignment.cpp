@@ -4381,6 +4381,79 @@ void Alignment::createLittleBootstrapAlignment(const IntVector& candidate_sites,
     }
 }
 
+void Alignment::createLittleBootstrapAlignment(Alignment *aln, const IntVector& candidate_sites, IntVector* pattern_freq, IntVector& candidate_sites_in_bootstrap_alignment) {
+    if (aln->isSuperAlignment()) outError("Internal error: ", __func__);
+    name = aln->name;
+    model_name = aln->model_name;
+    sequence_type = aln->sequence_type;
+    position_spec = aln->position_spec;
+    aln_file = aln->aln_file;
+    size_t nsite = aln->getNSite();
+    seq_names.insert(seq_names.begin(), aln->seq_names.begin(), aln->seq_names.end());
+    num_states = aln->num_states;
+    seq_type = aln->seq_type;
+    genetic_code = aln->genetic_code;
+    if (seq_type == SEQ_CODON) {
+    	codon_table = new char[num_states];
+    	memcpy(codon_table, aln->codon_table, num_states);
+    	non_stop_codon = new char[strlen(genetic_code)];
+    	memcpy(non_stop_codon, aln->non_stop_codon, strlen(genetic_code));
+    }
+    STATE_UNKNOWN = aln->STATE_UNKNOWN;
+    site_pattern.resize(nsite, -1);
+    clear();
+    pattern_index.clear();
+
+    // 2016-07-05: copy variables for PoMo
+    pomo_sampled_states = aln->pomo_sampled_states;
+    pomo_sampled_states_index = aln->pomo_sampled_states_index;
+    pomo_sampling_method = aln->pomo_sampling_method;
+    virtual_pop_size = aln->virtual_pop_size;
+
+    VerboseMode save_mode = verbose_mode;
+    verbose_mode = min(verbose_mode, VB_MIN); // to avoid printing gappy sites in addPattern
+    if (pattern_freq) {
+        pattern_freq->resize(0);
+        pattern_freq->resize(aln->getNPattern(), 0);
+    }
+
+	IntVector site_vec;
+    // little bootstrap
+    int added_sites = 0;
+    int subsample_size = candidate_sites.size();
+    IntVector sample(subsample_size, 1);
+    random_resampling(nsite - subsample_size, subsample_size, sample);
+    candidate_sites_in_bootstrap_alignment.resize(subsample_size);
+    for (size_t site = 0; site < subsample_size; ++site) {
+        for (int rep = 0; rep < sample[site]; ++rep) {
+            int ptn_id = aln->getPatternID(candidate_sites[site]);
+            Pattern pat = aln->at(ptn_id);
+            int nptn = getNPattern();
+            addPattern(pat, added_sites);
+            if (!aln->site_state_freq.empty() && getNPattern() > nptn) {
+                // a new pattern is added, copy state frequency vector
+                double *state_freq = new double[num_states];
+                memcpy(state_freq, aln->site_state_freq[ptn_id], num_states*sizeof(double));
+                site_state_freq.push_back(state_freq);
+            }
+            if (pattern_freq) ((*pattern_freq)[ptn_id])++;
+            candidate_sites_in_bootstrap_alignment[site] = added_sites;
+            added_sites++;
+        }
+    }
+    if (added_sites < nsite)
+        site_pattern.resize(added_sites);
+    if (!aln->site_state_freq.empty()) {
+        site_model = site_pattern;
+        ASSERT(site_state_freq.size() == getNPattern());
+    }
+    std::cerr << "num patterns in little bootstrap alignment: " << getNPattern() << endl;
+    verbose_mode = save_mode;
+    countConstSite();
+    //    buildSeqStates();
+}
+
+
 void Alignment::createLittleBootstrapFastAlignment(int nsite, IntVector& pattern_freq, int *rstream) {
     size_t nptn = getNPattern();
     size_t subsample_size = getNSite();
@@ -4394,6 +4467,29 @@ void Alignment::createLittleBootstrapFastAlignment(int nsite, IntVector& pattern
         int ptn_id = getPatternID(site);
         pattern_freq[ptn_id] += sample[site];
     }
+}
+
+void Alignment::createLittleBootstrapAlignment(const IntVector& candidate_sites, IntVector& pattern_freq, IntVector& candidate_sites_in_bootstrap_alignment, int *rstream) {
+    size_t nptn = getNPattern();
+    size_t nsite = getNSite();
+
+    pattern_freq.resize(nptn, 0);
+	IntVector site_vec;
+
+    int subsample_size = candidate_sites.size();
+    
+    IntVector sample(subsample_size, 1);
+    random_resampling(nsite - subsample_size, subsample_size, sample, rstream);
+    set<int> unique_pattern_id;
+    for (size_t site = 0; site < subsample_size; site++) {
+        int ptn_id = getPatternID(candidate_sites[site]);
+        pattern_freq[ptn_id] += sample[site];
+        candidate_sites_in_bootstrap_alignment[site] = ptn_id;
+        unique_pattern_id.insert(ptn_id);
+    }
+    // std::cerr << "num patterns in little bootstrap alignment: " << unique_pattern_id.size() << endl;
+    // printf("num patterns in little bootstrap alignment: %d\n", (int)unique_pattern_id.size());
+    assert(0);
 }
 
 void Alignment::createBootstrapAlignment(IntVector &pattern_freq, const char *spec) {

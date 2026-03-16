@@ -391,7 +391,7 @@ void IQTree::initSettings(Params &params) {
                     bootstrap_alignment = new Alignment;
                 IntVector this_sample;
                 if (params.fnbs) {
-                    aln->createLittleBootstrapFastAlignment(bootstrap_alignment, params.nbs_site, &this_sample);
+                    aln->createLittleBootstrapAlignment(bootstrap_alignment, *candidate_sites, &this_sample);
                 } else {
                     aln->createBootstrapAlignment(bootstrap_alignment, &this_sample, params.bootstrap_spec);
                 }
@@ -402,7 +402,7 @@ void IQTree::initSettings(Params &params) {
             } else {
                 IntVector this_sample;
                 if (params.fnbs) {
-                    aln->createLittleBootstrapFastAlignment(params.nbs_site, this_sample);
+                    aln->createLittleBootstrapAlignment(*candidate_sites, this_sample);
                 } else {
                     aln->createBootstrapAlignment(this_sample, params.bootstrap_spec);
                 }

@@ -7491,7 +7491,9 @@ void random_resampling(int n, IntVector &sample, int *rstream) {
 
 void random_resampling(int n, int m, IntVector &sample, bool replacement, int *rstream) {
     // little bootstrap resampling
-    sample.resize(m, 0);
+    if (sample.empty())
+        sample.resize(m, 0);
+    assert(sample.size() == m);
     if (!replacement) {
         for (int i = 0; i < n; i++) {
             int j = random_int(m, rstream);
